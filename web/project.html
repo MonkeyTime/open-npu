@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fiche projet · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/projects.css">
+  <script type="module" src="/assets/projects.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/history">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin" data-page="detail">
+    <a class="console-link back-link" href="/admin/projects">← Tous les projets</a>
+    <div class="console-heading project-heading">
+      <div><p class="section-label" id="project-id">Fiche projet</p><h1 id="project-name">Projet scientifique</h1></div>
+      <div class="toolbar"><span id="detail-status" class="node-status" hidden></span><a id="project-history" class="console-link" href="/admin/history" hidden>Historique du projet ↗</a><button id="reload-project" type="button" class="secondary">Actualiser</button></div>
+    </div>
+    <p id="detail-notice" role="status"></p>
+    <div class="project-grid" id="project-content" hidden>
+      <section class="panel">
+        <h2>Informations du projet</h2>
+        <form id="metadata-form">
+          <label for="name">Nom</label><input name="name" id="name" maxlength="100" required>
+          <label for="affiliation">Établissement ou laboratoire</label><input name="affiliation" id="affiliation" maxlength="150">
+          <label for="contact">Adresse de contact</label><input name="contact" id="contact" type="email" maxlength="254">
+          <label for="description">Description</label><textarea name="description" id="description" rows="5" maxlength="3000" required></textarea>
+          <button>Enregistrer les informations</button>
+        </form>
+      </section>
+      <div class="operations-aside">
+        <section class="panel"><h2>Instruction et accès API</h2><p id="access-state" class="muted"></p><div id="access-actions" class="toolbar"></div></section>
+        <section class="panel" id="reservation">
+          <h2>Réservation de nœuds</h2>
+          <p id="reservation-state" class="muted"></p>
+          <div id="reservation-controls" hidden>
+            <form id="reservation-form">
+              <label for="reservation-count">Nombre de nœuds</label>
+              <div class="reservation-actions">
+                <input id="reservation-count" type="number" min="1" max="100" step="1" required>
+                <button>Réserver automatiquement</button>
+                <button type="button" id="reserve-manual" class="secondary">Réserver la sélection</button>
+                <button type="button" id="release-reservation" class="quiet" hidden>Libérer</button>
+              </div>
+            </form>
+            <p id="transfer-state" class="muted"></p>
+            <details id="reserved-details" hidden><summary>Nœuds réservés</summary><ul id="reserved-nodes"></ul></details>
+          </div>
+        </section>
+      </div>
+      <section class="panel project-jobs">
+        <h2>Demandes de calcul récentes</h2>
+        <dl class="work-metrics project-metrics" id="project-metrics"></dl>
+        <div class="table-scroll" role="region" aria-label="Demandes de calcul" tabindex="0">
+          <table><thead><tr><th scope="col">Demande</th><th scope="col">Soumise le</th><th scope="col">État</th><th scope="col">Lots terminés</th></tr></thead><tbody id="project-jobs"></tbody></table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <dialog id="project-confirm" aria-labelledby="confirm-heading">
+    <h2 id="confirm-heading"></h2><p id="confirm-description"></p>
+    <form method="dialog" class="dialog-actions"><button value="cancel" class="secondary">Annuler</button><button value="confirm" id="confirm-run"></button></form>
+  </dialog>
+  <dialog id="project-secret" aria-labelledby="key-heading">
+    <h2 id="key-heading">Clé API du projet</h2>
+    <label for="project-key">Clé API à transmettre au porteur du projet</label>
+    <textarea id="project-key" rows="2" readonly></textarea>
+    <p>Copiez-la maintenant. Elle s’affiche une seule fois.</p>
+    <form method="dialog" class="dialog-actions"><button>Fermer</button></form>
+  </dialog>
+</body>
+</html>

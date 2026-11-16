@@ -1,0 +1,92 @@
+.console {
+  color: #18302a;
+  --line: #d3dfd6;
+  --muted: #52675e;
+  --mint: #b4f3d1;
+}
+.console #admin { width: min(1320px, calc(100% - 3rem)); margin-block: 2.4rem; }
+.console-header { min-height: 62px; background: #17372e; color: #f3fbf5; padding-inline: max(1.5rem, calc((100% - 1320px) / 2)); }
+.console-header nav { display: flex; gap: 1.3rem; margin-right: auto; margin-left: min(3vw, 2rem); }
+.console-header a { color: inherit; font-size: .9rem; white-space: nowrap; }
+.console-header .site-link { color: #c7ded3; }
+.project-directory-link { color: #235642; font-weight: 650; }
+.console-heading, .fleet-title, .filters, .selection-toolbar, .pagination, .toolbar, .dialog-actions {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+}
+.console-heading, .fleet-title { justify-content: space-between; }
+.console h1 { font-size: clamp(2.5rem, 6vw, 4rem); margin: 0; }
+.section-label { color: var(--muted); margin: 0 0 .45rem; font-size: .84rem; font-weight: 650; }
+.connection { font-size: .83rem; color: var(--muted); margin-block: .8rem 1rem; }
+.connection.error, .console [role="status"].error { color: #a32823; }
+.console .panel { background: #fff; border-radius: .65rem; padding: clamp(.85rem, 2vw, 1.4rem); }
+.console button { color: #fff; background: #235642; border-radius: .4rem; padding: .56rem .8rem; font-size: .89rem; }
+.console button.secondary, .console button.quiet { background: #fff; color: #235642; border-color: #b8cabd; }
+.console button.quiet { border-color: #fff; }
+.console .selection-toolbar button.secondary, .console .selection-toolbar button.quiet { background: #f3f7f3; }
+.console .selection-toolbar button.quiet { border-color: #f3f7f3; }
+.console button.danger { color: #9a352f; background: #fff4f1; border-color: #ebc9c3; }
+.console button:not(:disabled):hover { border-color: #337e5f; }
+.console button.danger:not(:disabled):hover { border-color: #9a352f; }
+.console button:disabled,
+.console .selection-toolbar button:disabled { background: #e8eeea; color: #596c61; border-color: #d3dfd6; }
+.console :focus-visible { outline-color: #337e5f; }
+.fleet-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .55rem; margin-bottom: 1rem; }
+.console .fleet-summary button { display: grid; gap: .15rem; text-align: left; color: var(--muted); background: #fff; border: 1px solid var(--line); padding: .7rem .85rem; }
+.console .fleet-summary button strong { color: #18302a; font-size: 1.55rem; }
+.console .fleet-summary button[aria-pressed="true"] { border-color: #297455; background: #e7f2e9; }
+.fleet-title { margin-bottom: 1rem; }
+.fleet-title h2 { margin: 0; }
+#node-total, .pagination, .selection-toolbar { color: var(--muted); font-size: .87rem; }
+.filters { align-items: end; margin-bottom: .95rem; }
+.filters > :first-child { flex: 1 1 15rem; }
+.console input:not([type="checkbox"]), .console select, .console textarea {
+  background: #f9fbf9; color: #18302a; border: 1px solid #b9cabd; font: inherit; padding: .55rem .65rem; border-radius: .4rem;
+}
+.console input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: #235642; }
+.console label { font-size: .88rem; margin-bottom: .35rem; }
+.selection-toolbar { min-height: 3.1rem; background: #f3f7f3; padding: .4rem .55rem; border-radius: .4rem .4rem 0 0; }
+#selection-count { margin-right: auto; }
+#fleet-notice, #projects-notice { margin: .55rem 0; }
+.table-scroll { overflow-x: auto; }
+.console table { border-collapse: collapse; text-align: left; width: 100%; min-width: 670px; }
+.fleet table { min-width: 820px; }
+.node-network { min-width: 10rem; }
+.console th, .console td { padding: .7rem .5rem; border-bottom: 1px solid var(--line); font-size: .87rem; }
+.console th { color: var(--muted); white-space: nowrap; }
+.console th:first-child, .console td:first-child { width: 2.5rem; }
+.console td:last-child { width: 7rem; }
+.console td:nth-child(2) { min-width: 10rem; overflow-wrap: anywhere; }
+.console small { display: block; color: var(--muted); margin-top: .18rem; }
+.node-status { display: inline-block; border-radius: 1rem; background: #ebefee; color: #41564e; padding: .24rem .58rem; white-space: nowrap; }
+.node-status.online { background: #dff1e5; color: #235b40; }
+.node-status.working { background: #dfeaf8; color: #254f78; }
+.node-status.reserved { background: #eee8f8; color: #57378a; }
+.node-status.offline { background: #fff0dc; color: #744514; }
+.node-status.paused { background: #fff0dc; color: #744514; }
+.pagination { justify-content: flex-end; padding-top: .75rem; }
+.pagination span { margin-right: auto; }
+.operations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.operations-aside { display: grid; gap: 1rem; }
+.work-metrics { margin: 0; display: grid; gap: .55rem; }
+.work-metrics div { display: flex; justify-content: space-between; gap: .6rem; }
+.work-metrics dd { font-size: .92rem; margin: 0; }
+.events { padding: 0; margin: 0; list-style: none; }
+.events li + li { border-top: 1px solid var(--line); margin-top: .55rem; padding-top: .55rem; }
+.events li, .console .entry p { overflow-wrap: anywhere; }
+.reservation { margin-top: .9rem; }
+.reservation fieldset { border: 1px solid var(--line); border-radius: .4rem; padding: .7rem; min-width: 0; }
+.reservation legend { font-size: .9rem; font-weight: 650; padding-inline: .3rem; }
+.reservation details { margin-bottom: .6rem; font-size: .85rem; overflow-wrap: anywhere; }
+.reservation summary { cursor: pointer; }
+.reservation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.reservation-actions input { width: 4.5rem; }
+.console dialog { color: inherit; background: #fff; border: 1px solid #567366; border-radius: .65rem; max-width: min(29rem, calc(100vw - 2rem)); padding: 1.4rem; box-shadow: 0 0 0 3px #e0ebe3; }
+.console dialog::backdrop { background: none; }
+.dialog-actions { justify-content: flex-end; }
+.dialog-actions a { color: #235642; margin-right: auto; }
+@media (max-width: 680px) {
+  .console #admin { width: calc(100% - 1.5rem); margin-top: 1.35rem; }
+  .console-header { padding-inline: .8rem; }
+  .console-header nav { display: none; }
+  .operations { grid-template-columns: 1fr; }
+}

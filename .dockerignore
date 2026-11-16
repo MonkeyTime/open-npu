@@ -1,0 +1,9 @@
+**
+!server.py
+!capsule.py
+!network.py
+!requirements-server.txt
+!web/
+!web/**
+!deploy/
+!deploy/Dockerfile

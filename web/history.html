@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Historique · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/history.css">
+  <script type="module" src="/assets/history.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/history" aria-current="page">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin">
+    <div class="console-heading">
+      <div><p class="section-label">Administration</p><h1>Historique</h1></div>
+      <div class="toolbar"><a class="project-directory-link" href="/admin">Retour à la flotte ↗</a><button type="button" id="history-refresh" class="secondary">Actualiser</button></div>
+    </div>
+    <section class="panel history-panel" aria-labelledby="history-title">
+      <div class="fleet-title"><h2 id="history-title">Journal des actions</h2><span id="history-total" class="muted"></span></div>
+      <form id="history-filters" class="history-filters">
+        <div><label for="action">Type d’action</label><select id="action" name="action"><option value="">Toutes les actions</option></select></div>
+        <div><label for="actor">Origine</label><select id="actor" name="actor"><option value="">Toutes</option><option value="admin">Administration</option><option value="agent">Agent</option></select></div>
+        <div><label for="project">Projet</label><input id="project" name="project" type="search" maxlength="160" placeholder="Nom ou identifiant"></div>
+        <div><label for="node">Nœud</label><input id="node" name="node" type="search" maxlength="160" placeholder="Nom ou identifiant"></div>
+        <div><label for="from">Du</label><input id="from" type="date"></div>
+        <div><label for="until">Au</label><input id="until" type="date"></div>
+        <div><label for="size">Par page</label><select id="size" name="size"><option>25</option><option>50</option><option>100</option></select></div>
+        <div class="toolbar"><button>Appliquer</button><button type="reset" class="secondary">Réinitialiser</button></div>
+      </form>
+      <p id="history-notice" role="status"></p>
+      <div class="table-scroll" role="region" aria-label="Tableau de l’historique" tabindex="0">
+        <table>
+          <thead><tr><th scope="col">Date et heure</th><th scope="col">Action</th><th scope="col">Origine</th><th scope="col">Projets et nœuds</th><th scope="col">Effet</th></tr></thead>
+          <tbody id="history-rows"><tr><td colspan="5">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="history-page"></span>
+        <button type="button" id="history-previous" class="secondary" disabled>Précédente</button>
+        <button type="button" id="history-next" class="secondary" disabled>Suivante</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

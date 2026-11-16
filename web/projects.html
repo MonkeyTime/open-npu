@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Projets scientifiques · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/projects.css">
+  <script type="module" src="/assets/projects.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects" aria-current="page">Projets</a><a href="/admin/history">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin" data-page="list">
+    <div class="console-heading">
+      <div><p class="section-label">Administration</p><h1>Projets scientifiques</h1></div>
+      <a class="console-link" href="/admin#flotte">Voir la flotte ↗</a>
+    </div>
+    <p id="selection-bridge" class="transfer" role="status"></p>
+    <div id="project-summary" class="fleet-summary projects-summary" aria-label="Filtrer les projets par statut"></div>
+    <section class="panel" aria-labelledby="project-list-title">
+      <div class="fleet-title"><h2 id="project-list-title">Liste des projets</h2><span id="project-total" class="muted"></span></div>
+      <form id="project-filters" class="filters">
+        <div><label for="project-search">Rechercher</label><input id="project-search" type="search" maxlength="160" placeholder="Projet, identifiant, établissement ou contact"></div>
+        <div><label for="project-status">Statut</label><select id="project-status"><option value="">Tous</option><option value="pending">En attente</option><option value="approved">Approuvé</option><option value="rejected">Refusé</option></select></div>
+        <div><label for="project-reservation">Nœuds réservés</label><select id="project-reservation"><option value="">Tous</option><option value="reserved">Avec réservation</option><option value="shared">Sans réservation</option></select></div>
+        <div><label for="project-sort">Tri</label><select id="project-sort"><option value="recent">Plus récents</option><option value="name">Nom (A–Z)</option></select></div>
+        <div><label for="project-size">Par page</label><select id="project-size"><option>25</option><option>50</option><option>100</option></select></div>
+        <button class="secondary" type="reset">Réinitialiser</button>
+      </form>
+      <p id="list-notice" role="status"></p>
+      <div class="table-scroll" role="region" aria-label="Tableau des projets" tabindex="0">
+        <table>
+          <thead><tr><th scope="col">Projet</th><th scope="col">Établissement et contact</th><th scope="col">Statut</th><th scope="col">Nœuds réservés</th><th scope="col">Demandes</th></tr></thead>
+          <tbody id="project-rows"><tr><td colspan="5">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="project-page"></span>
+        <button id="project-previous" type="button" class="secondary" disabled>Précédente</button>
+        <button id="project-next" type="button" class="secondary" disabled>Suivante</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OPEN-NPU · Administration</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <script type="module" src="/assets/admin.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin" aria-current="page">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/history">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin">
+    <div class="console-heading">
+      <div><p class="section-label">Administration</p><h1>Flotte NPU</h1></div>
+      <div class="toolbar"><button type="button" id="refresh" class="secondary">Actualiser</button></div>
+    </div>
+    <p id="connection-status" class="connection" role="status">Chargement de la flotte…</p>
+    <div class="fleet-summary" id="fleet-summary" aria-label="Filtrer par état"></div>
+    <section class="panel fleet" id="flotte" aria-labelledby="fleet-title">
+      <div class="fleet-title"><h2 id="fleet-title">Nœuds</h2><span id="node-total"></span></div>
+      <p class="muted">Les postes apparaissent ici dès que leur agent OPEN-NPU s’inscrit.</p>
+      <form id="filters" class="filters">
+        <div><label for="search">Rechercher</label><input type="search" id="search" maxlength="160" placeholder="Nom, identifiant ou accélérateur"></div>
+        <div><label for="node-state">État</label><select id="node-state">
+          <option value="">Tous les états</option><option value="working">En calcul</option>
+          <option value="online">Disponible</option><option value="reserved">Réservé</option><option value="paused">En pause</option><option value="offline">Hors ligne</option>
+          <option value="new">Jamais connecté</option><option value="disabled">Désactivé</option>
+        </select></div>
+        <div><label for="page-size">Par page</label><select id="page-size"><option>25</option><option>50</option><option>100</option></select></div>
+      </form>
+      <div class="selection-toolbar">
+        <span id="selection-count">Aucun nœud sélectionné</span>
+        <button type="button" id="enable-selected" class="secondary" disabled>Réactiver</button>
+        <button type="button" id="disable-selected" class="danger" disabled>Désactiver</button>
+        <button type="button" id="transfer-project" class="secondary" disabled>Affecter à un projet</button>
+        <button type="button" id="clear-selection" class="quiet" hidden>Effacer</button>
+      </div>
+      <p id="fleet-notice" role="status"></p>
+      <div class="table-scroll" role="region" aria-label="Tableau des nœuds" tabindex="0">
+        <table>
+          <thead><tr>
+            <th scope="col"><input id="select-page" type="checkbox" aria-label="Sélectionner les nœuds de cette page" disabled></th>
+            <th scope="col">Nœud</th><th scope="col">État</th><th scope="col">Accélérateur</th><th scope="col">Réseau</th><th scope="col">Dernier contact</th><th scope="col">Action</th>
+          </tr></thead>
+          <tbody id="nodes"><tr><td colspan="7">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="page-info"></span>
+        <button type="button" id="previous" class="secondary" disabled>Précédente</button>
+        <button type="button" id="next" class="secondary" disabled>Suivante</button>
+      </div>
+    </section>
+    <div class="operations">
+      <section class="panel"><h2>File de calcul</h2><p id="queue-notice" role="status"></p><dl class="work-metrics" id="metrics"></dl></section>
+      <section class="panel" id="historique"><h2>Actions récentes sur la flotte</h2><ol id="events" class="events"></ol><p><a class="project-directory-link" href="/admin/history">Ouvrir le journal ↗</a></p></section>
+    </div>
+  </main>
+  <dialog id="confirm-action" aria-labelledby="confirm-title">
+    <h2 id="confirm-title"></h2><p id="confirm-detail"></p>
+    <p id="confirm-notice" role="status"></p>
+    <div class="dialog-actions"><button type="button" data-close="confirm-action" class="secondary">Annuler</button><button type="button" id="confirm-button"></button></div>
+  </dialog>
+</body>
+</html>

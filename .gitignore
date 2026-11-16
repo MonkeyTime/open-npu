@@ -1,0 +1,9 @@
+.venv/
+.tools/
+__pycache__/
+build/
+dist/
+*.spec
+runtime/
+.env
+deploy/secrets/

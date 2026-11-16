@@ -1,0 +1,24 @@
+.console-link { color: #235642; font-weight: 650; }
+.console-header a[aria-current="page"] { text-decoration: underline; text-underline-offset: .35rem; }
+.projects-summary { margin-top: 1.2rem; }
+.transfer { padding: .6rem .8rem; background: #e5f0e9; border-radius: .4rem; }
+#list-notice, #detail-notice { margin-block: .6rem; }
+#project-rows td:first-child { width: auto; min-width: 11rem; }
+#project-rows td:last-child { width: auto; }
+#project-rows td:nth-child(2), #project-rows td:first-child { overflow-wrap: anywhere; }
+#project-rows a { color: #21523e; font-weight: 700; text-decoration: underline; text-underline-offset: .18em; }
+.node-status.pending { background: #fff0dc; color: #744514; }
+.node-status.rejected, .node-status.failed { background: #f9e8e5; color: #86382f; }
+.node-status.approved, .node-status.done { background: #dff1e5; color: #235b40; }
+.back-link { display: inline-block; margin-bottom: 1rem; }
+.project-heading { margin-bottom: 1rem; }
+.project-heading h1 { overflow-wrap: anywhere; }
+.project-grid:not([hidden]) { display: grid; grid-template-columns: 1fr .95fr; align-items: start; gap: 1rem; }
+.project-jobs { grid-column: 1 / -1; }
+.project-metrics { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: .9rem; }
+.project-metrics div { border: 1px solid var(--line); border-radius: .35rem; padding: .4rem .55rem; }
+#project-jobs td:first-child { width: auto; overflow-wrap: anywhere; }
+#project-jobs td:nth-child(2) { min-width: 8rem; }
+#reserved-details { margin-top: .6rem; }
+#reserved-nodes { overflow-wrap: anywhere; }
+@media (max-width: 760px) { .project-grid:not([hidden]) { grid-template-columns: 1fr; } }

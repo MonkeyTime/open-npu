@@ -1,0 +1,13 @@
+{$OPEN_NPU_DOMAIN} {
+    @admin_external {
+        path /admin /admin/*
+        not remote_ip {$OPEN_NPU_ADMIN_CIDR}
+    }
+    respond @admin_external 403
+
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
+    reverse_proxy open-npu:8787
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="OPEN-NPU explore le calcul scientifique distribué sur les unités de traitement neuronal des campus et des volontaires.">
+  <title>OPEN-NPU — Calcul distribué pour la recherche</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/landing.css">
+  <script type="module" src="/assets/portal.js"></script>
+</head>
+<body class="public" id="top">
+  <a class="skip" href="#contenu">Aller au contenu</a>
+  <header class="site-header">
+    <a class="brand" href="#top"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Navigation principale">
+      <a href="#fonctionnement">Fonctionnement</a>
+      <a href="#pilote">Périmètre du pilote</a>
+      <a class="cta small" href="#proposer">Proposer un projet <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+  <main id="contenu" class="public-main">
+    <section class="hero wrap" aria-labelledby="title">
+      <div>
+        <p class="eyebrow">Infrastructure ouverte pour la recherche</p>
+        <h1 id="title">Le calcul distribué à l’échelle des campus.</h1>
+        <p class="lead">OPEN-NPU explore la mise en commun des unités de traitement neuronal (NPU) d’ordinateurs volontaires pour exécuter des tâches scientifiques par lots.</p>
+        <a class="cta" href="#proposer">Proposer un projet <span aria-hidden="true">↗</span></a>
+      </div>
+      <figure class="network">
+        <div class="network-stage">
+          <div class="network-item origin">Projet de recherche</div>
+          <div class="stem"></div>
+          <div class="network-item hub">File de calcul <span>API OPEN-NPU</span></div>
+          <div class="branches" aria-hidden="true"><b></b><b></b><b></b></div>
+          <div class="node-row">
+            <div class="network-item">NPU <span>Lot A</span></div>
+            <div class="network-item">NPU <span>Lot B</span></div>
+            <div class="network-item">NPU <span>Lot C</span></div>
+          </div>
+        </div>
+        <figcaption>Schéma de principe du traitement par lots.</figcaption>
+      </figure>
+    </section>
+    <section class="section wrap" id="fonctionnement" aria-labelledby="how">
+      <h2 id="how">Du projet aux résultats</h2>
+      <ol class="process">
+        <li><h3>Soumettre un cas d’usage</h3><p>L’équipe décrit l’objectif scientifique, le type de données et les calculs envisagés. Après examen, un projet approuvé reçoit une clé API.</p></li>
+        <li><h3>Distribuer les lots</h3><p>Les agents Windows prennent les lots compatibles avec leur NPU. Chaque agent exécute un graphe de calcul prédéfini. Si un nœud décroche, son lot peut être repris.</p></li>
+        <li><h3>Récupérer les résultats</h3><p>L’API indique l’avancement et rassemble les résultats dans l’ordre de la demande. Plusieurs machines peuvent traiter des lots indépendants en parallèle.</p></li>
+      </ol>
+    </section>
+    <section class="pilot" id="pilote" aria-labelledby="scope">
+      <div class="wrap pilot-inner">
+        <div>
+          <p class="eyebrow">Périmètre du pilote</p>
+          <h2 id="scope">Une expérimentation ouverte aux équipes de recherche.</h2>
+        </div>
+        <div>
+          <p>Le prototype local valide l’exécution d’un calcul de démonstration sur Intel AI Boost, de la soumission à la restitution des résultats.</p>
+          <p>Pour un premier cas d’usage, nous cherchons des tâches répétables, faciles à répartir et dont les résultats peuvent être comparés à une référence. L’inférence sur des lots d’images de microscopie est un exemple à étudier.</p>
+          <p>Les équipes peuvent proposer une charge de calcul. Les services numériques et les équipes chargées du calcul scientifique peuvent signaler des postes compatibles pour un futur pilote interétablissements.</p>
+        </div>
+      </div>
+    </section>
+    <section class="section wrap proposal" id="proposer" aria-labelledby="submit">
+      <div>
+        <h2 id="submit">Proposer un projet</h2>
+        <p>Décrivez le cas d’usage, le volume estimé et la façon dont vous valideriez les résultats. Pour une contribution matérielle, indiquez le nombre de postes et les modèles de NPU.</p>
+        <p>Ce formulaire recueille une description du projet. Évitez d’y inclure des données de recherche confidentielles.</p>
+      </div>
+      <form id="project-form">
+        <label for="project-name">Nom du projet</label>
+        <input id="project-name" name="name" maxlength="100" required>
+        <label for="affiliation">Établissement ou laboratoire</label>
+        <input id="affiliation" name="affiliation" maxlength="150" autocomplete="organization" required>
+        <label for="contact">Adresse de contact</label>
+        <input id="contact" name="contact" type="email" maxlength="254" autocomplete="email" required>
+        <label for="description">Description de la proposition</label>
+        <textarea id="description" name="description" rows="5" maxlength="3000" required></textarea>
+        <button class="cta">Envoyer la proposition <span aria-hidden="true">↗</span></button>
+        <p id="submission-status" role="status"></p>
+      </form>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap"><a class="brand" href="#top"><i aria-hidden="true"></i>OPEN-NPU</a>
+      <p>Open Participatory Edge Network for Neural Processing Units</p>
+      <a href="/admin">Administration <span aria-hidden="true">↗</span></a></div>
+  </footer>
+</body>
+</html>
