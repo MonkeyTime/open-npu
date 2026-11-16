@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Connexion · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <script type="module" src="/assets/login.js"></script>
+</head>
+<body class="console">
+  <header class="console-header"><a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a></header>
+  <main>
+    <section class="panel">
+      <h1>Connexion</h1>
+      <form id="login-form">
+        <label for="name">Identifiant</label><input id="name" name="name" autocomplete="username" required maxlength="48">
+        <label for="password">Mot de passe</label><input id="password" name="password" autocomplete="current-password" type="password" required maxlength="150">
+        <label for="code">Code à six chiffres, si activé</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6">
+        <button>Se connecter</button>
+        <p id="login-result" role="status"></p>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

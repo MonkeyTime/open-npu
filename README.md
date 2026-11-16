@@ -32,7 +32,13 @@ L’icône OPEN-NPU apparaît dans la zone de notification Windows, près de l�
 
 Le dossier distribué contient une clé d’inscription commune. Elle permet d’inscrire un poste. Chaque agent génère ensuite une identité distincte qu’il conserve après une réinstallation. Réservez le dossier aux participants et conservez le fichier `node.json` dans le profil local.
 
+Les paramètres de contribution permettent aussi d’exiger une alimentation secteur et de limiter le partage à une plage quotidienne, à l’heure locale de Windows. Une plage peut traverser minuit. Un lot déjà commencé peut se terminer.
+
 ### Gérer la flotte
+
+L’administration contient des rubriques dédiées **Calculs**, **Accès** et **Supervision**. Les comptes nominatifs peuvent utiliser un code TOTP et reçoivent un rôle propriétaire, opérateur ou lecture seule. Le compte technique `superadmin` reste disponible avec HTTP Basic pour l’amorçage. Un propriétaire peut révoquer définitivement l’identité d’un nœud. Une nouvelle inscription est alors nécessaire pour ce poste.
+
+La rubrique **Accès** gère les invitations de postes et les clés API nommées à durée définie, en lecture seule ou en lecture et écriture. Une clé en lecture seule ne peut ni soumettre ni annuler. La rubrique **Calculs** filtre et pagine les demandes, permet l’annulation et relance une demande annulée ou en échec sous un nouvel identifiant. La fiche d’un projet approuvé permet de suspendre l’admission et de définir ses quotas ainsi que sa priorité.
 
 Dans l’administration, recherchez un nœud par nom, identifiant ou accélérateur. Les compteurs filtrent la liste par état et le tableau affiche de 25 à 100 nœuds par page. Une sélection est conservée pendant la navigation et l’actualisation. Vous pouvez désactiver ou réactiver jusqu’à 100 nœuds en une action après avoir vérifié la sélection.
 

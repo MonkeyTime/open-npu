@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Calculs · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/control.css">
+  <script type="module" src="/assets/control.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs" aria-current="page">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin" data-control="jobs">
+    <div class="console-heading"><div><p class="section-label">Administration</p><h1>Calculs</h1></div><button type="button" id="refresh-control" class="secondary">Actualiser</button></div>
+    <p id="control-notice" role="status"></p>
+    <section class="panel">
+      <form id="jobs-filters" class="control-form">
+        <label>Projet ou identifiant de demande <input type="search" name="q" maxlength="100"></label>
+        <label>État <select name="status"><option value="">Tous</option><option value="queued">En attente</option><option value="running">En cours</option><option value="done">Terminés</option><option value="failed">En échec</option><option value="cancelled">Annulés</option></select></label>
+        <label>Par page <select name="size"><option>25</option><option>50</option><option>100</option></select></label>
+        <button>Filtrer</button>
+      </form>
+      <div class="table-scroll" tabindex="0" aria-label="Calculs">
+        <table><thead><tr><th>Demande</th><th>Projet</th><th>Soumise le</th><th>État</th><th>Progression</th><th>Action</th></tr></thead><tbody id="job-rows"></tbody></table>
+      </div>
+      <div class="pagination"><span id="job-page"></span><button id="job-prev" class="secondary" type="button" disabled>Précédente</button><button id="job-next" class="secondary" type="button" disabled>Suivante</button></div>
+    </section>
+  </main>
+  <dialog id="action-dialog"><h2 id="action-title">Confirmer l’action</h2><p id="action-text"></p><form method="dialog" class="dialog-actions"><button value="cancel" class="secondary">Annuler</button><button value="confirm">Confirmer</button></form></dialog>
+</body>
+</html>

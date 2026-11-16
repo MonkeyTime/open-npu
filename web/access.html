@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Accès · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/control.css">
+  <script type="module" src="/assets/control.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access" aria-current="page">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin" data-control="access">
+    <div class="console-heading"><div><p class="section-label">Administration</p><h1>Accès</h1></div><button type="button" id="refresh-control" class="secondary">Actualiser</button></div>
+    <p id="control-notice" role="status"></p>
+    <div class="control-grid">
+      <section class="panel" aria-labelledby="invite-title">
+        <h2 id="invite-title">Invitations de postes</h2>
+        <form id="invite-form" class="control-form">
+          <label>Libellé <input name="label" maxlength="100" required></label>
+          <label>Validité en heures <input name="hours" type="number" min="1" max="168" value="24" required></label>
+          <label>Nombre de postes <input name="max_uses" type="number" min="1" max="100" value="5" required></label>
+          <button>Créer l’invitation</button>
+        </form>
+        <div class="table-scroll" tabindex="0" aria-label="Invitations">
+          <table><thead><tr><th>Invitation</th><th>Expire le</th><th>Utilisations</th><th>État</th><th>Action</th></tr></thead><tbody id="invite-rows"></tbody></table>
+        </div>
+      </section>
+      <section class="panel" id="keys-panel" aria-labelledby="keys-title">
+        <h2 id="keys-title">Clés API par projet</h2>
+        <form id="lookup-form" class="control-form"><label>Identifiant du projet <input name="project" type="number" min="1" required></label><button class="secondary">Afficher les clés</button></form>
+        <form id="key-form" class="control-form" hidden>
+          <label>Nom de la clé <input name="label" maxlength="100" required></label>
+          <label>Droits <select name="scope"><option value="read">Lecture</option><option value="write">Lecture et écriture</option></select></label>
+          <label>Validité en jours <input name="days" type="number" min="1" max="365" value="30" required></label>
+          <button>Créer la clé</button>
+        </form>
+        <div id="key-table" class="table-scroll" tabindex="0" aria-label="Clés du projet" hidden>
+          <table><thead><tr><th>Clé</th><th>Droits</th><th>Expire le</th><th>État</th><th>Action</th></tr></thead><tbody id="key-rows"></tbody></table>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="account-title">
+        <h2 id="account-title">Comptes d’administration</h2>
+        <p id="account-info"></p>
+        <div class="toolbar"><a class="project-directory-link" href="/login">Changer de compte ↗</a><button id="logout" class="secondary" type="button" hidden>Se déconnecter</button></div>
+        <form id="account-form" class="control-form" hidden>
+          <label>Identifiant <input name="name" minlength="3" maxlength="48" pattern="[a-zA-Z0-9_.\-]+" required></label>
+          <label>Rôle <select name="role"><option value="reader">Lecture seule</option><option value="operator">Opérateur</option><option value="owner">Propriétaire</option></select></label>
+          <label><input name="mfa" type="checkbox" checked> Activer le code à usage unique</label>
+          <button>Créer le compte</button>
+        </form>
+        <div id="accounts-table" class="table-scroll" tabindex="0" aria-label="Comptes nominatifs" hidden>
+          <table><thead><tr><th>Identifiant</th><th>Rôle</th><th>Code à usage unique</th><th>État</th><th>Action</th></tr></thead><tbody id="account-rows"></tbody></table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <dialog id="action-dialog"><h2 id="action-title">Confirmer l’action</h2><p id="action-text"></p><form method="dialog" class="dialog-actions"><button value="cancel" class="secondary">Annuler</button><button value="confirm">Confirmer</button></form></dialog>
+  <dialog id="credential-dialog"><h2 id="credential-title">Identifiant d’accès</h2><label for="credential-value">Valeur affichée une seule fois</label><textarea id="credential-value" rows="4" readonly></textarea><form method="dialog" class="dialog-actions"><button>Fermer</button></form></dialog>
+</body>
+</html>

@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 from pystray import Icon, Menu, MenuItem
 
 from network import MAX_RATE, MIN_UPLOAD_LIMIT, optional_number
+from preferences import clock_minutes
 
 
 def icon_image(color):
@@ -21,12 +22,13 @@ def icon_image(color):
     return image
 
 
-def show_settings(preferences, stop):
+def show_settings(preferences, stop, version=None):
     root = tk.Tk()
     try:
         root.title("Paramètres OPEN-NPU")
         root.resizable(False, False)
-        limit = preferences.snapshot()[1]
+        settings = preferences.settings()
+        limit = settings["upload_limit_mbps"]
         enabled = tk.BooleanVar(root, value=limit is not None)
         value = tk.StringVar(root, value=format(limit, "g").replace(".", ",") if limit is not None else "")
         panel = ttk.Frame(root, padding=20)
@@ -47,16 +49,49 @@ def show_settings(preferences, stop):
             row=2, columnspan=2, sticky="w")
         amount.pack(side="left")
         ttk.Label(rate_field, text="Mbit/s").pack(side="left", padx=(8, 0))
+        contribution = ttk.LabelFrame(panel, text="Contribution", padding=10)
+        contribution.grid(row=4, columnspan=2, sticky="ew", pady=(0, 12))
+        ac_only = tk.BooleanVar(root, value=settings["ac_only"])
+        scheduled = tk.BooleanVar(root, value=settings["schedule_start"] is not None)
+        start = tk.StringVar(root, value=settings["schedule_start"] or "22:00")
+        end = tk.StringVar(root, value=settings["schedule_end"] or "07:00")
+        ttk.Checkbutton(contribution, text="Uniquement sur secteur", variable=ac_only).grid(row=0, sticky="w")
+        times = ttk.Frame(contribution)
+        times.grid(row=2, sticky="w", pady=(4, 0))
+        start_entry = ttk.Entry(times, textvariable=start, width=7)
+        end_entry = ttk.Entry(times, textvariable=end, width=7)
+
+        def update_schedule():
+            state = ("!disabled",) if scheduled.get() else ("disabled",)
+            start_entry.state(state)
+            end_entry.state(state)
+
+        ttk.Checkbutton(contribution, text="Limiter à une plage horaire quotidienne", variable=scheduled,
+                        command=update_schedule).grid(row=1, sticky="w")
+        start_entry.pack(side="left")
+        ttk.Label(times, text="à").pack(side="left", padx=5)
+        end_entry.pack(side="left")
+        ttk.Label(times, text="(heure Windows)").pack(side="left", padx=5)
+        update_schedule()
 
         def save():
             try:
                 rate = None
                 if enabled.get():
                     rate = optional_number(float(value.get().strip().replace(",", ".")), MIN_UPLOAD_LIMIT, MAX_RATE)
-                preferences.update(upload_limit_mbps=rate)
             except ValueError:
                 messagebox.showerror("Plafond invalide", "Saisissez une valeur entre 0,05 et 100 000 Mbit/s.", parent=root)
                 amount.focus_set()
+                return
+            try:
+                first = start.get().strip() if scheduled.get() else None
+                last = end.get().strip() if scheduled.get() else None
+                if scheduled.get() and clock_minutes(first) == clock_minutes(last):
+                    raise ValueError("Choisissez des heures de début et de fin différentes.")
+                preferences.update(upload_limit_mbps=rate, ac_only=ac_only.get(),
+                                   schedule_start=first, schedule_end=last)
+            except ValueError as error:
+                messagebox.showerror("Plage horaire invalide", str(error), parent=root)
                 return
             except OSError:
                 logging.exception("Impossible d’enregistrer le plafond.")
@@ -65,7 +100,9 @@ def show_settings(preferences, stop):
             root.quit()
 
         buttons = ttk.Frame(panel)
-        buttons.grid(row=4, columnspan=2, sticky="e")
+        buttons.grid(row=5, columnspan=2, sticky="e")
+        if version:
+            ttk.Label(panel, text=f"Agent {version}").grid(row=6, columnspan=2, sticky="w", pady=(8, 0))
         ttk.Button(buttons, text="Annuler", command=root.quit).pack(side="left")
         ttk.Button(buttons, text="Enregistrer", command=save).pack(side="left", padx=(8, 0))
         root.bind("<Escape>", lambda _: root.quit())
@@ -85,7 +122,7 @@ def show_settings(preferences, stop):
         root.destroy()
 
 
-def run_tray(log_file, preferences, run_agent):
+def run_tray(log_file, preferences, run_agent, *, version=None):
     stop = Event()
     status = "Démarrage"
     colors = {"ready": "#74e4a3", "working": "#8ccbff", "waiting": "#ffd182", "error": "#ff948a"}
@@ -103,7 +140,7 @@ def run_tray(log_file, preferences, run_agent):
 
     def settings_worker():
         try:
-            show_settings(preferences, stop)
+            show_settings(preferences, stop, version)
         except Exception:
             logging.exception("Impossible d’ouvrir les paramètres.")
         finally:

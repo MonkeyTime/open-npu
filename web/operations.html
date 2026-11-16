@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Supervision · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/control.css">
+  <script type="module" src="/assets/control.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations" aria-current="page">Supervision</a><a href="/admin/history">Historique</a></nav>
+    <a class="site-link" href="/">Voir le site ↗</a>
+  </header>
+  <main id="admin" data-control="operations">
+    <div class="console-heading"><div><p class="section-label">Administration</p><h1>Supervision</h1></div><button type="button" id="refresh-control" class="secondary">Actualiser</button></div>
+    <p id="control-notice" role="status"></p>
+    <div class="control-grid">
+      <section class="panel"><h2>État de l’instance</h2><dl id="instance-metrics" class="work-metrics"></dl></section>
+      <section class="panel"><h2>File de calcul</h2><dl id="task-metrics" class="work-metrics"></dl><p><a class="project-directory-link" href="/admin/jobs">Ouvrir les calculs ↗</a></p></section>
+      <section class="panel"><h2>Versions des agents en ligne</h2><dl id="version-metrics" class="work-metrics"></dl></section>
+    </div>
+  </main>
+
+</body>
+</html>

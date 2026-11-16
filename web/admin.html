@@ -11,7 +11,7 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin" aria-current="page">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/history">Historique</a></nav>
+    <nav aria-label="Administration"><a href="/admin" aria-current="page">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
     <a class="site-link" href="/">Voir le site ↗</a>
   </header>
   <main id="admin">
@@ -29,7 +29,7 @@
         <div><label for="node-state">État</label><select id="node-state">
           <option value="">Tous les états</option><option value="working">En calcul</option>
           <option value="online">Disponible</option><option value="reserved">Réservé</option><option value="paused">En pause</option><option value="offline">Hors ligne</option>
-          <option value="new">Jamais connecté</option><option value="disabled">Désactivé</option>
+          <option value="new">Jamais connecté</option><option value="disabled">Désactivé</option><option value="revoked">Révoqué</option>
         </select></div>
         <div><label for="page-size">Par page</label><select id="page-size"><option>25</option><option>50</option><option>100</option></select></div>
       </form>

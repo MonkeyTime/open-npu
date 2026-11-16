@@ -2,7 +2,7 @@ import {api, element, transferSelection} from "./portal.js";
 
 const find = (id) => document.getElementById(id);
 const labels = {working: "En calcul", online: "Disponible", reserved: "Réservé", paused: "En pause", offline: "Hors ligne",
-                new: "Jamais connecté", disabled: "Désactivé"};
+                new: "Jamais connecté", disabled: "Désactivé", revoked: "Révoqué"};
 const date = new Intl.DateTimeFormat("fr-FR", {dateStyle: "short", timeStyle: "medium"});
 const number = new Intl.NumberFormat("fr-FR", {maximumFractionDigits: 3});
 const selected = new Set();
@@ -130,6 +130,10 @@ function nodeRow(node, data) {
   actionButton.id = `action-node-${node.id}`;
   actionButton.setAttribute("aria-label", `${actionButton.textContent} ${node.name} (nœud ${node.id})`);
   actionCell.append(actionButton);
+  if (node.state === "revoked" || data.role === "reader") actionCell.replaceChildren();
+  if (node.state !== "revoked" && data.role === "owner") {
+    actionCell.append(button("Révoquer", () => confirmAction("revoke", [node.id], node.name), "danger"));
+  }
   row.append(selection, name, status, element("td", node.hardware || node.device || "—"), networkCell(node, data),
     element("td", formatSeen(node.seen)), actionCell);
   return row;
@@ -239,13 +243,16 @@ for (const close of document.querySelectorAll("[data-close]")) {
 function confirmAction(action, ids, name) {
   pendingAction = {action, node_ids: ids};
   const disabling = action === "disable";
-  const verb = disabling ? "Désactiver" : "Réactiver";
+  const revoking = action === "revoke";
+  const verb = revoking ? "Révoquer" : disabling ? "Désactiver" : "Réactiver";
   find("confirm-title").textContent = name ? `${verb} ${name}` : `${verb} la sélection`;
-  find("confirm-detail").textContent = disabling
+  find("confirm-detail").textContent = revoking
+    ? "L’identité du poste sera invalidée. Une nouvelle inscription sera nécessaire."
+    : disabling
     ? `${ids.length} nœud(s). Les lots en cours seront remis dans la file pour être repris.`
     : `${ids.length} nœud(s). Les agents restés ouverts reprendront à leur prochaine connexion.`;
   find("confirm-button").textContent = verb;
-  find("confirm-button").classList.toggle("danger", disabling);
+  find("confirm-button").classList.toggle("danger", disabling || revoking);
   notice("confirm-notice", "");
   confirmDialog.showModal();
 }
@@ -260,10 +267,12 @@ find("confirm-button").addEventListener("click", async () => {
   fleetRequest++;
   updateSelection();
   try {
-    const result = await api("/admin/fleet/actions", pendingAction);
+    const revoking = pendingAction.action === "revoke";
+    const result = revoking ? await api(`/admin/nodes/${pendingAction.node_ids[0]}/revoke`, {})
+      : await api("/admin/fleet/actions", pendingAction);
     for (const id of pendingAction.node_ids) selected.delete(id);
     confirmDialog.close();
-    const message = result.changed
+    const message = revoking ? `Nœud révoqué. Lots remis en file : ${result.released}.` : result.changed
       ? `Nœuds modifiés : ${result.changed}. Lots remis en file : ${result.released}.`
       : "Les nœuds sélectionnés étaient déjà dans cet état.";
     notice("fleet-notice", message);

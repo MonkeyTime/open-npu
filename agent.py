@@ -1,6 +1,8 @@
 """Agent Windows OPEN-NPU. Le seul graphe exécutable est intégré au binaire."""
 
 import argparse
+import ctypes
+from datetime import datetime
 import json
 import logging
 from logging.handlers import RotatingFileHandler
@@ -21,7 +23,7 @@ from openvino import Core, Model, Type, opset13
 from capsule import CAPSULE, WIDTH, valid_values
 from network import (MAX_RATE, MIN_UPLOAD_LIMIT, PROBE_BYTES, PROBE_INTERVAL, estimate_mbps,
                      optional_number, paced_body)
-from preferences import Preferences, save_json
+from preferences import Preferences, pause_reason, save_json
 from tray import run_tray
 
 
@@ -31,6 +33,22 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 HTTP = build_opener(NoRedirect)
+AGENT_VERSION = "0.2.0"
+
+
+class SystemPowerStatus(ctypes.Structure):
+    _fields_ = [("ac", ctypes.c_ubyte), ("battery", ctypes.c_ubyte), ("percent", ctypes.c_ubyte),
+                ("flags", ctypes.c_ubyte), ("remaining", ctypes.c_uint32), ("full", ctypes.c_uint32)]
+
+
+def contribution(preferences):
+    settings = preferences.settings()
+    plugged_in = True
+    if settings["ac_only"]:
+        power = SystemPowerStatus()
+        plugged_in = bool(ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(power))) and power.ac == 1
+    now = datetime.now()
+    return pause_reason(settings, now.hour * 60 + now.minute, plugged_in), settings["upload_limit_mbps"]
 
 
 def compile_capsule():
@@ -143,7 +161,7 @@ def measure_network(config):
 def run(config, compiled, device, hardware, stop, status, preferences):
     pending = None
     network = {}
-    capacity = {"capsule": CAPSULE, "device": device, "network": network}
+    capacity = {"capsule": CAPSULE, "device": device, "network": network, "agent_version": AGENT_VERSION}
     probe_after = 0
     sample_limit = None
     previous_limit = None
@@ -152,7 +170,7 @@ def run(config, compiled, device, hardware, stop, status, preferences):
         capacity["hardware"] = hardware
     while not stop.is_set() or pending is not None:
         preferences.changed.clear()
-        paused, limit = preferences.snapshot()
+        reason, limit = contribution(preferences)
         if limit != previous_limit:
             probe_after = 0
             previous_limit = limit
@@ -164,7 +182,7 @@ def run(config, compiled, device, hardware, stop, status, preferences):
                 pending = None
             if stop.is_set():
                 break
-            if not paused and time.monotonic() >= probe_after:
+            if not reason and time.monotonic() >= probe_after:
                 try:
                     network["sample"] = measure_network(config | {"upload_limit_mbps": limit})
                     sample_limit = limit
@@ -177,8 +195,8 @@ def run(config, compiled, device, hardware, stop, status, preferences):
                     logging.info("Mesure réseau différée (%s).", type(error).__name__)
             if stop.is_set():
                 break
-            paused, limit = preferences.snapshot()
-            capacity["paused"] = paused
+            reason, limit = contribution(preferences)
+            capacity["paused"] = bool(reason)
             network["upload_limit_mbps"] = limit
             if limit != sample_limit:
                 network.pop("sample", None)
@@ -192,7 +210,7 @@ def run(config, compiled, device, hardware, stop, status, preferences):
                 pending = {key: task[key] for key in ("job", "position", "lease")}
                 pending["values"] = calculate(compiled, task["values"])
                 continue
-            status("Partage en pause" if paused else "Disponible", "waiting" if paused else "ready")
+            status(reason or "Disponible", "waiting" if reason else "ready")
             delay = idle_delay
             idle_delay = min(12, idle_delay * 1.5)
         except HTTPError as error:
@@ -260,7 +278,8 @@ def main():
                     logging.info("Un agent utilise déjà cette configuration.")
                     return 0
                 preferences = Preferences(args.config)
-                run_tray(log_file, preferences, lambda stop, status: run_agent(args.config, stop, status, preferences))
+                run_tray(log_file, preferences, lambda stop, status: run_agent(args.config, stop, status, preferences),
+                         version=AGENT_VERSION)
     except Exception:
         logging.exception("Arrêt de l'agent.")
         return 1

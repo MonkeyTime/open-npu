@@ -2,7 +2,7 @@
 
 ## Préparer la préproduction
 
-Le mode `pilot` conserve la capsule de démonstration Intel AI Boost. Au démarrage il exige un nom d’hôte autorisé et un secret administrateur externe. Il désactive l’inscription avec la clé locale partagée. Les services exposés doivent passer par le frontal HTTPS. L’administration utilise encore un compte technique unique et doit rester accessible uniquement via le réseau d’administration.
+Le mode `pilot` conserve la capsule de démonstration Intel AI Boost. Au démarrage il exige un nom d’hôte autorisé et un secret administrateur externe. Il désactive l’inscription avec la clé locale partagée. Les services exposés doivent passer par le frontal HTTPS. L’administration doit rester accessible uniquement via le réseau d’administration. Utilisez `superadmin` pour amorcer les comptes nominatifs depuis **Accès**, puis connectez ces opérateurs sur `/login`. Activez TOTP à la création et transmettez le mot de passe et le secret TOTP par des canaux sûrs. Les sauvegardes de la base contiennent les secrets TOTP et doivent rester chiffrées et privées.
 
 1. Choisir le domaine, le réseau VPN d’administration et une machine Linux dédiée. Configurer le DNS, les accès entrants HTTPS et la persistance du stockage.
 2. Copier `deploy/pilot.env.example` vers `deploy/.env` et renseigner le domaine, le CIDR réellement vu par Caddy et le chemin du secret. Inscrire dans ce fichier de secret au moins 32 caractères aléatoires. Sur Linux, rendre le fichier lisible pour le groupe du compte de service 10001. Vérifier le montage et ses droits avec la version de Compose installée.
@@ -22,7 +22,7 @@ Restaurer d’abord vers un **nouvel emplacement** avec la même commande. Déma
 | Chantier | Validation à obtenir |
 |---|---|
 | Charge scientifique | Capsule réelle approuvée, jeu de référence, tolérances et reproduction des résultats |
-| Identités | Comptes nominatifs, SSO/MFA, rôles, séparation des établissements et révocation des nœuds |
+| Identités | Intégration SSO institutionnelle et séparation des établissements. Les comptes nominatifs, TOTP, rôles et la révocation des nœuds sont implémentés. |
 | Agent Windows | Installateur signé et horodaté, mise à jour et désinstallation éprouvées, matrice des pilotes |
 | Exploitation | Alertes, astreinte, rétention et politique de sauvegarde avec essai de restauration mesuré |
 | Réseau et capacité | Essais multi-campus, incidents simulés et décision SQLite ou PostgreSQL fondée sur la charge |

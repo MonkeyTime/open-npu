@@ -84,7 +84,9 @@ if ($setLimit) {
     $preferences = @{ paused = $false }
     if (Test-Path -LiteralPath $preferencesPath) {
         $saved = Get-Content -LiteralPath $preferencesPath -Raw | ConvertFrom-Json
-        $preferences.paused = $saved.paused -eq $true
+        foreach ($property in $saved.PSObject.Properties) {
+            $preferences[$property.Name] = $property.Value
+        }
     }
     $preferences.upload_limit_mbps = if ($UploadLimitMbps -gt 0) { $UploadLimitMbps } else { $null }
     Save-AgentSettings $preferencesPath $preferences

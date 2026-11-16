@@ -128,6 +128,7 @@ function renderList() {
 function renderDetail() {
   const route = location.pathname.replace(/\/$/, "");
   const edit = find("metadata-form");
+  const policy = find("policy-form");
   const reservation = find("reservation-form");
   const count = find("reservation-count");
   const confirm = find("project-confirm");
@@ -139,6 +140,7 @@ function renderDetail() {
   let busy = false;
   let revision = 0;
   let accessSnapshot = "";
+  let policySnapshot = "";
 
   function ask(title, description, label, run) {
     if (busy) return;
@@ -241,11 +243,23 @@ function renderDetail() {
     const status = find("detail-status");
     status.className = `node-status ${project.status}`;
     status.textContent = statuses[project.status];
+    const keys = find("scoped-keys");
+    keys.href = `/admin/access?project=${project.id}`;
+    keys.hidden = project.status !== "approved";
     status.hidden = false;
     find("project-content").hidden = false;
     if (!dirty) for (const input of edit.querySelectorAll("[name]")) input.value = project[input.name] ?? "";
     updateAccess(project);
     updateReservation(project);
+    find("project-policy").hidden = project.status !== "approved";
+    const rules = JSON.stringify(project.policy);
+    if (policySnapshot !== rules) {
+      policySnapshot = rules;
+      policy.elements.admissions.checked = Boolean(project.policy.admissions);
+      policy.elements.max_active.value = project.policy.max_active ?? 20;
+      policy.elements.per_minute.value = project.policy.per_minute ?? 30;
+      policy.elements.priority.value = project.policy.priority;
+    }
     find("project-metrics").replaceChildren(...Object.entries(taskLabels).map(([key, label]) => {
       const row = document.createElement("div");
       row.append(element("dt", label), element("dd", project.tasks[key] ?? 0));
@@ -272,6 +286,13 @@ function renderDetail() {
   }
 
   edit.addEventListener("input", () => { dirty = true; });
+  policy.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fields = policy.elements;
+    mutate("/policy", {admissions: fields.admissions.checked, max_active: Number(fields.max_active.value),
+      per_minute: Number(fields.per_minute.value), priority: Number(fields.priority.value)},
+    () => notice("detail-notice", "Règles d’admission enregistrées."));
+  });
   edit.addEventListener("submit", (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(edit));

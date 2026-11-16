@@ -11,6 +11,16 @@ const actions = {
   key_rotated: "Remplacement de clé API",
   nodes_reserved: "Réservation de nœuds",
   reservation_released: "Libération de réservation",
+  invite_created: "Création d’invitation",
+  invite_revoked: "Révocation d’invitation",
+  admin_created: "Création d’un compte",
+  admin_revoked: "Révocation d’un compte",
+  key_created: "Création de clé API",
+  key_revoked: "Révocation de clé API",
+  node_revoked: "Révocation de nœud",
+  job_cancelled: "Annulation de calcul",
+  job_retried: "Relance de calcul",
+  project_policy_updated: "Modification de l’admission et de la priorité",
 };
 const origins = {admin: "Administration", agent: "Agent"};
 const formatDate = new Intl.DateTimeFormat("fr-FR", {dateStyle: "short", timeStyle: "medium"});
@@ -52,6 +62,16 @@ function effect(event) {
     case "project_rejected": return "Projet classé comme refusé";
     case "project_updated": return "Informations enregistrées";
     case "key_rotated": return "Ancienne clé invalidée";
+    case "invite_created": return "Invitation disponible";
+    case "invite_revoked": return "Nouvelles inscriptions bloquées";
+    case "admin_created": return "Compte nominal créé";
+    case "admin_revoked": return "Accès administratif retiré";
+    case "key_created": return "Nouvel accès API";
+    case "key_revoked": return "Accès de cette clé retiré";
+    case "node_revoked": return `Identité invalidée · lots remis en file : ${event.released}`;
+    case "job_cancelled": return "Lots non terminés annulés";
+    case "job_retried": return "Nouvelle demande créée";
+    case "project_policy_updated": return "Nouvelles règles d’admission et de priorité";
     default: return "—";
   }
 }
@@ -95,7 +115,7 @@ function row(event) {
   const when = document.createElement("td");
   when.append(time);
   entry.append(when, element("td", actions[event.action] ?? event.action),
-    element("td", origins[event.actor] ?? event.actor), targets(event), element("td", effect(event)));
+    element("td", event.actor_name ?? origins[event.actor] ?? event.actor), targets(event), element("td", effect(event)));
   return entry;
 }
 

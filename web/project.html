@@ -12,7 +12,7 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/history">Historique</a></nav>
+    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
     <a class="site-link" href="/">Voir le site ↗</a>
   </header>
   <main id="admin" data-page="detail">
@@ -34,7 +34,18 @@
         </form>
       </section>
       <div class="operations-aside">
-        <section class="panel"><h2>Instruction et accès API</h2><p id="access-state" class="muted"></p><div id="access-actions" class="toolbar"></div></section>
+        <section class="panel"><h2>Instruction et accès API</h2><p id="access-state" class="muted"></p><div id="access-actions" class="toolbar"></div><p><a id="scoped-keys" class="console-link" href="/admin/access" hidden>Gérer les clés nommées ↗</a></p></section>
+        <section class="panel" id="project-policy" hidden>
+          <h2>Admission et priorité</h2>
+          <form id="policy-form">
+            <label><input name="admissions" type="checkbox"> Accepter les nouvelles demandes</label>
+            <label>Demandes actives maximum <input name="max_active" type="number" min="1" max="1000" required></label>
+            <label>Nouvelles demandes par minute <input name="per_minute" type="number" min="1" max="1000" required></label>
+            <label>Priorité <select name="priority"><option value="0">Normale</option><option value="1">Élevée</option><option value="2">Très élevée</option><option value="3">Urgente</option></select></label>
+            <p class="muted">Suspendre l’admission laisse les demandes déjà soumises se terminer.</p>
+            <button>Enregistrer les règles</button>
+          </form>
+        </section>
         <section class="panel" id="reservation">
           <h2>Réservation de nœuds</h2>
           <p id="reservation-state" class="muted"></p>

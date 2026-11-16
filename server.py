@@ -1,6 +1,8 @@
 """Portail et API OPEN-NPU."""
 
 import hashlib
+import base64
+import hmac
 import json
 import os
 from pathlib import Path
@@ -12,7 +14,7 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager
 
-from flask import Flask, abort, jsonify, request
+from flask import Flask, abort, g, has_request_context, jsonify, request
 from waitress import serve
 
 from capsule import CAPSULE, MAX_VALUES, WIDTH, valid_values
@@ -48,9 +50,12 @@ PROBE_BODY = secrets.token_bytes(PROBE_BYTES)
 ONLINE_SECONDS = 25
 MAX_BULK_NODES = 100
 PAGE_SIZES = (25, 50, 100)
-NODE_STATES = ("working", "online", "reserved", "paused", "offline", "new", "disabled")
+NODE_STATES = ("working", "online", "reserved", "paused", "offline", "new", "disabled", "revoked")
 HISTORY_ACTIONS = ("node_enrolled", "node_created", "enable", "disable", "project_approved",
-                   "project_rejected", "project_updated", "key_rotated", "nodes_reserved", "reservation_released")
+                   "project_rejected", "project_updated", "key_rotated", "nodes_reserved", "reservation_released",
+                   "invite_created", "invite_revoked", "admin_created", "admin_revoked", "key_created", "key_revoked",
+                   "node_revoked", "job_cancelled", "job_retried", "project_policy_updated")
+ROLES = ("owner", "operator", "reader")
 
 
 @contextmanager
@@ -78,6 +83,12 @@ def initialize():
         db.executescript("""
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS administrators (
+                name TEXT PRIMARY KEY, secret TEXT NOT NULL, role TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS admin_sessions (
+                secret TEXT PRIMARY KEY, name TEXT NOT NULL REFERENCES administrators(name), expires REAL NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending', api_key TEXT UNIQUE,
@@ -93,6 +104,16 @@ def initialize():
                 project INTEGER NOT NULL REFERENCES projects(id)
             );
             CREATE INDEX IF NOT EXISTS project_nodes_by_project ON project_nodes(project);
+            CREATE TABLE IF NOT EXISTS project_keys (
+                id INTEGER PRIMARY KEY, project INTEGER NOT NULL REFERENCES projects(id),
+                label TEXT NOT NULL, secret TEXT NOT NULL UNIQUE, scope TEXT NOT NULL,
+                expires REAL NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS project_keys_by_project ON project_keys(project,id);
+            CREATE TABLE IF NOT EXISTS project_policy (
+                project INTEGER PRIMARY KEY REFERENCES projects(id), admissions INTEGER NOT NULL,
+                max_active INTEGER NOT NULL, per_minute INTEGER NOT NULL, priority INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS node_network (
                 node INTEGER PRIMARY KEY REFERENCES nodes(id),
                 upload_limit_mbps REAL, upload_mbps REAL, download_mbps REAL, rtt_ms REAL,
@@ -110,6 +131,9 @@ def initialize():
             );
             CREATE TABLE IF NOT EXISTS job_cancellations (
                 job TEXT PRIMARY KEY REFERENCES jobs(id), created REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS job_retries (
+                original TEXT PRIMARY KEY REFERENCES jobs(id), replacement TEXT NOT NULL REFERENCES jobs(id)
             );
             CREATE TABLE IF NOT EXISTS enrollment_invites (
                 id INTEGER PRIMARY KEY, label TEXT NOT NULL, secret TEXT NOT NULL UNIQUE,
@@ -163,6 +187,17 @@ def initialize():
             db.execute("ALTER TABLE nodes ADD COLUMN capsule TEXT")
         if "paused" not in node_columns:
             db.execute("ALTER TABLE nodes ADD COLUMN paused INTEGER NOT NULL DEFAULT 0")
+        if "revoked" not in node_columns:
+            db.execute("ALTER TABLE nodes ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0")
+        if "agent_version" not in node_columns:
+            db.execute("ALTER TABLE nodes ADD COLUMN agent_version TEXT")
+        history_columns = {column["name"] for column in db.execute("PRAGMA table_info(history_events)")}
+        if "actor_name" not in history_columns:
+            db.execute("ALTER TABLE history_events ADD COLUMN actor_name TEXT")
+        account_columns = {column["name"] for column in db.execute("PRAGMA table_info(administrators)")}
+        if "totp" not in account_columns:
+            db.execute("ALTER TABLE administrators ADD COLUMN totp TEXT")
+            db.execute("ALTER TABLE administrators ADD COLUMN last_totp INTEGER")
         if not db.execute("SELECT 1 FROM settings WHERE name='history_migrated'").fetchone():
             for event in db.execute("SELECT * FROM fleet_events ORDER BY id"):
                 ids = json.loads(event["node_ids"])
@@ -187,13 +222,54 @@ def initialize():
             db.execute("INSERT INTO settings VALUES ('admin', ?)", (digest(password),))
 
 
-def admin(db):
+def admin(db, *, owner=False):
     auth = request.authorization
-    expected = PILOT_ADMIN_HASH if PILOT else db.execute("SELECT value FROM settings WHERE name='admin'").fetchone()[0]
-    if not auth or auth.type != "basic" or auth.username != "superadmin" or not secrets.compare_digest(
-        digest(auth.password or ""), expected
-    ):
+    session = request.cookies.get("open_npu_admin")
+    if session:
+        row = db.execute("""
+            SELECT a.name,a.role FROM admin_sessions s JOIN administrators a ON a.name=s.name
+            WHERE s.secret=? AND s.expires>? AND a.revoked=0
+        """, (digest(session), time.time())).fetchone()
+        if row is not None:
+            return authorize_admin(row["name"], row["role"], owner)
         abort(401)
+    if not auth or auth.type != "basic" or not auth.username:
+        abort(401)
+    name = auth.username.casefold()
+    if name == "superadmin":
+        expected = PILOT_ADMIN_HASH if PILOT else db.execute("SELECT value FROM settings WHERE name='admin'").fetchone()[0]
+        role = "owner"
+    else:
+        row = db.execute("SELECT secret,role FROM administrators WHERE name=? AND revoked=0 AND totp IS NULL", (name,)).fetchone()
+        if row is None:
+            abort(401)
+        expected, role = row["secret"], row["role"]
+    if not secrets.compare_digest(digest(auth.password or ""), expected):
+        abort(401)
+    return authorize_admin(name, role, owner)
+
+
+def authorize_admin(name, role, owner):
+    if (owner and role != "owner") or (request.method not in ("GET", "HEAD", "OPTIONS") and role == "reader"):
+        abort(403, description="Votre rôle ne permet pas cette opération.")
+    g.operator = name
+    return role
+
+
+def totp_counter(key, code, now, lower_bound):
+    if not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}", code):
+        return None
+    raw = base64.b32decode(key)
+    period = int(now // 30)
+    for counter in range(period - 1, period + 2):
+        if lower_bound is not None and counter <= lower_bound:
+            continue
+        mac = hmac.digest(raw, counter.to_bytes(8, "big"), "sha1")
+        offset = mac[-1] & 15
+        value = (int.from_bytes(mac[offset:offset + 4], "big") & 0x7fffffff) % 1_000_000
+        if secrets.compare_digest(f"{value:06d}", code):
+            return counter
+    return None
 
 
 def bearer():
@@ -205,8 +281,9 @@ def bearer():
 
 def record_history(db, action, *, actor="admin", nodes=(), projects=(), quantity=None, released=0, created=None):
     event_id = db.execute("""
-        INSERT INTO history_events(created,actor,action,quantity,released) VALUES (?,?,?,?,?)
-    """, (time.time() if created is None else created, actor, action, quantity, released)).lastrowid
+        INSERT INTO history_events(created,actor,action,quantity,released,actor_name) VALUES (?,?,?,?,?,?)
+    """, (time.time() if created is None else created, actor, action, quantity, released,
+          getattr(g, "operator", None) if actor == "admin" and has_request_context() else None)).lastrowid
     db.executemany("INSERT INTO history_nodes(event,node) VALUES (?,?)",
                    ((event_id, node_id) for node_id in sorted(set(nodes))))
     db.executemany("INSERT INTO history_projects(event,project) VALUES (?,?)",
@@ -231,16 +308,24 @@ def history_entries(db, events):
     return list(entries.values())
 
 
-def project(db):
-    row = db.execute("SELECT id FROM projects WHERE status='approved' AND api_key=?", (bearer(),)).fetchone()
+def project(db, *, write=False):
+    secret = bearer()
+    row = db.execute("SELECT id FROM projects WHERE status='approved' AND api_key=?", (secret,)).fetchone()
+    if row is None:
+        row = db.execute("""
+            SELECT p.id,k.scope FROM project_keys k JOIN projects p ON p.id=k.project
+            WHERE k.secret=? AND k.revoked=0 AND k.expires>? AND p.status='approved'
+        """, (secret, time.time())).fetchone()
+        if row is not None and write and row["scope"] != "write":
+            abort(403, description="Cette clé est limitée à la lecture.")
     if row is None:
         abort(401)
     return row["id"]
 
 
 def node(db):
-    row = db.execute("SELECT id,enabled FROM nodes WHERE secret=?", (bearer(),)).fetchone()
-    if row is None:
+    row = db.execute("SELECT id,enabled,revoked FROM nodes WHERE secret=?", (bearer(),)).fetchone()
+    if row is None or row["revoked"]:
         abort(401)
     if not row["enabled"]:
         abort(403, description="Nœud désactivé par l’administration.")
@@ -271,7 +356,7 @@ def field(data, key, limit):
 @app.errorhandler(429)
 def show_error(error):
     response = jsonify(error=error.description)
-    if error.code == 401 and request.path.startswith("/admin"):
+    if error.code == 401 and request.path.startswith("/admin") and request.path != "/admin/session":
         response.headers["WWW-Authenticate"] = 'Basic realm="OPEN-NPU"'
     return response, error.code
 
@@ -316,6 +401,147 @@ def history_page():
     with database() as db:
         admin(db)
     return app.send_static_file("history.html")
+
+
+@app.get("/admin/access")
+def access_page():
+    with database() as db:
+        admin(db)
+    return app.send_static_file("access.html")
+
+
+@app.get("/login")
+def login_page():
+    return app.send_static_file("login.html")
+
+
+@app.post("/admin/session")
+def login():
+    data = payload()
+    name = field(data, "name", 48).casefold()
+    password = field(data, "password", 150)
+    now = time.time()
+    session = token()
+    with database() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT secret,totp,last_totp FROM administrators WHERE name=? AND revoked=0", (name,)).fetchone()
+        if row is None or not secrets.compare_digest(row["secret"], digest(password)):
+            abort(401, description="Identifiants ou code invalide.")
+        if row["totp"]:
+            counter = totp_counter(row["totp"], data.get("code"), now, row["last_totp"])
+            if counter is None:
+                abort(401, description="Identifiants ou code invalide.")
+            db.execute("UPDATE administrators SET last_totp=? WHERE name=?", (counter, name))
+        db.execute("DELETE FROM admin_sessions WHERE expires<=?", (now,))
+        existing = request.cookies.get("open_npu_admin")
+        if existing:
+            db.execute("DELETE FROM admin_sessions WHERE secret=?", (digest(existing),))
+        db.execute("INSERT INTO admin_sessions VALUES (?,?,?)", (digest(session), name, now + 3600 * 8))
+    response = jsonify(username=name)
+    response.set_cookie("open_npu_admin", session, max_age=3600 * 8, httponly=True, secure=PILOT, samesite="Strict")
+    return response
+
+
+@app.post("/admin/session/logout")
+def logout():
+    payload()
+    if session := request.cookies.get("open_npu_admin"):
+        with database() as db:
+            db.execute("DELETE FROM admin_sessions WHERE secret=?", (digest(session),))
+    response = jsonify(signed_out=True)
+    response.delete_cookie("open_npu_admin", secure=PILOT, httponly=True, samesite="Strict")
+    return response
+
+
+@app.get("/admin/access/data")
+def access_state():
+    with database() as db:
+        role = admin(db)
+        accounts = [dict(row) for row in db.execute("""
+            SELECT name,role,revoked,totp IS NOT NULL AS mfa FROM administrators ORDER BY name
+        """)] if role == "owner" else []
+    return jsonify(username=g.operator, role=role, accounts=accounts)
+
+
+@app.post("/admin/access/accounts")
+def create_account():
+    data = payload()
+    name = field(data, "name", 48).casefold()
+    role = data.get("role")
+    mfa = data.get("mfa", False)
+    if name == "superadmin" or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{2,47}", name) or role not in ROLES or type(mfa) is not bool:
+        abort(400, description="Identifiant ou rôle invalide.")
+    password = token()
+    totp = base64.b32encode(secrets.token_bytes(20)).decode("ascii") if mfa else None
+    with database() as db:
+        admin(db, owner=True)
+        if not db.execute("""
+            INSERT INTO administrators(name,secret,role,totp) VALUES (?,?,?,?) ON CONFLICT(name) DO NOTHING
+        """, (name, digest(password), role, totp)).rowcount:
+            abort(409, description="Cet identifiant est déjà utilisé.")
+        record_history(db, "admin_created")
+    return jsonify(username=name, password=password, totp=totp), 201
+
+
+@app.post("/admin/access/accounts/<name>/revoke")
+def revoke_account(name):
+    payload()
+    with database() as db:
+        admin(db, owner=True)
+        if name in ("superadmin", g.operator):
+            abort(409, description="Utilisez un autre compte propriétaire pour cette révocation.")
+        if db.execute("UPDATE administrators SET revoked=1 WHERE name=? AND revoked=0", (name,)).rowcount:
+            record_history(db, "admin_revoked")
+        elif not db.execute("SELECT 1 FROM administrators WHERE name=?", (name,)).fetchone():
+            abort(404)
+    return jsonify(revoked=True)
+
+
+@app.get("/admin/projects/<int:project_id>/keys")
+def project_keys(project_id):
+    with database() as db:
+        admin(db)
+        read_project(db, project_id)
+        rows = db.execute("SELECT id,label,scope,expires,revoked FROM project_keys WHERE project=? ORDER BY id DESC",
+                          (project_id,))
+        return jsonify(keys=[dict(row) for row in rows])
+
+
+@app.post("/admin/projects/<int:project_id>/keys")
+def create_project_key(project_id):
+    data = payload()
+    label = field(data, "label", 100)
+    scope = data.get("scope")
+    days = data.get("days")
+    if scope not in ("read", "write") or type(days) is not int or not 1 <= days <= 365:
+        abort(400, description="Indiquez les droits et une durée de 1 à 365 jours.")
+    key = token()
+    with database() as db:
+        admin(db)
+        db.execute("BEGIN IMMEDIATE")
+        if read_project(db, project_id)["status"] != "approved":
+            abort(409, description="Le projet doit être approuvé.")
+        key_id = db.execute("""
+            INSERT INTO project_keys(project,label,secret,scope,expires) VALUES (?,?,?,?,?)
+        """, (project_id, label, digest(key), scope, time.time() + days * 86400)).lastrowid
+        record_history(db, "key_created", projects=(project_id,))
+    return jsonify(id=key_id, api_key=key), 201
+
+
+@app.post("/admin/projects/<int:project_id>/keys/<int:key_id>/revoke")
+def revoke_project_key(project_id, key_id):
+    payload()
+    with database() as db:
+        admin(db)
+        read_project(db, project_id)
+        if key_id > 2**63 - 1:
+            abort(404)
+        if not db.execute("SELECT 1 FROM project_keys WHERE project=? AND id=?", (project_id, key_id)).fetchone():
+            abort(404)
+        if db.execute("UPDATE project_keys SET revoked=1 WHERE project=? AND id=? AND revoked=0",
+                      (project_id, key_id)).rowcount:
+            record_history(db, "key_revoked", projects=(project_id,))
+    return jsonify(revoked=True)
 
 
 @app.get("/admin/history/data")
@@ -456,6 +682,7 @@ def project_detail(project_id):
         now = time.time()
         expire(db, now)
         project_data["reserved_nodes"] = reservation_state(db, now, project_id)[project_id]
+        project_data["policy"] = project_policy(db, project_id)
         project_data["tasks"] = {row["status"]: row["total"] for row in db.execute("""
             SELECT t.status,count(*) AS total FROM jobs j JOIN tasks t ON t.job=j.id
             WHERE j.project=? GROUP BY t.status
@@ -484,6 +711,37 @@ def update_project(project_id):
         if values != tuple(current[key] for key in ("name", "description", "affiliation", "contact")):
             db.execute("UPDATE projects SET name=?,description=?,affiliation=?,contact=? WHERE id=?", (*values, project_id))
             record_history(db, "project_updated", projects=(project_id,))
+    return jsonify(saved=True)
+
+
+def project_policy(db, project_id):
+    row = db.execute("SELECT admissions,max_active,per_minute,priority FROM project_policy WHERE project=?",
+                     (project_id,)).fetchone()
+    if row:
+        return dict(row)
+    return {"admissions": True, "max_active": PILOT_ACTIVE_JOBS if PILOT else None,
+            "per_minute": PILOT_JOBS_PER_MINUTE if PILOT else None, "priority": 0}
+
+
+@app.post("/admin/projects/<int:project_id>/policy")
+def update_project_policy(project_id):
+    data = payload()
+    active, rate, priority = (data.get(name) for name in ("max_active", "per_minute", "priority"))
+    admitting = data.get("admissions")
+    if (type(admitting) is not bool or type(active) is not int or not 1 <= active <= 1000
+            or type(rate) is not int or not 1 <= rate <= 1000 or type(priority) is not int or not 0 <= priority <= 3):
+        abort(400, description="Utilisez des quotas de 1 à 1 000 et une priorité de 0 à 3.")
+    with database() as db:
+        admin(db)
+        db.execute("BEGIN IMMEDIATE")
+        if read_project(db, project_id)["status"] != "approved":
+            abort(409, description="Le projet doit être approuvé.")
+        db.execute("""
+            INSERT INTO project_policy VALUES (?,?,?,?,?) ON CONFLICT(project) DO UPDATE SET
+                admissions=excluded.admissions,max_active=excluded.max_active,per_minute=excluded.per_minute,
+                priority=excluded.priority
+        """, (project_id, admitting, active, rate, priority))
+        record_history(db, "project_policy_updated", projects=(project_id,))
     return jsonify(saved=True)
 
 
@@ -552,6 +810,7 @@ def fleet():
         WITH fleet AS (
             SELECT n.id,n.name,n.seen,n.device,n.hardware,p.name AS project_name,
                 net.upload_limit_mbps,net.upload_mbps,net.download_mbps,net.rtt_ms,net.sampled_at,net.local_link, CASE
+                WHEN n.revoked=1 THEN 'revoked'
                 WHEN n.enabled=0 THEN 'disabled'
                 WHEN EXISTS (
                     SELECT 1 FROM tasks WHERE node=n.id AND status='running' AND expires>?
@@ -569,7 +828,7 @@ def fleet():
     matching = " WHERE (?='' OR state=?)"
     params = [now, *([now - ONLINE_SECONDS] * 3), status, status]
     with database() as db:
-        admin(db)
+        role = admin(db)
         db.execute("BEGIN")
         if search:
             db.create_function("fold", 1, str.casefold, deterministic=True)
@@ -592,7 +851,7 @@ def fleet():
                   for row in history_entries(db, db.execute("""
                       SELECT * FROM history_events WHERE action IN ('enable','disable') ORDER BY id DESC LIMIT 8
                   """))]
-    return jsonify(nodes=nodes, counts=counts, total=total, page=page, pages=pages, events=events,
+    return jsonify(nodes=nodes, counts=counts, total=total, page=page, pages=pages, events=events, role=role,
                    now=now, sample_valid_seconds=SAMPLE_VALID_SECONDS)
 
 
@@ -707,6 +966,7 @@ def create_invite():
         admin(db)
         invite = db.execute("INSERT INTO enrollment_invites(label,secret,expires,max_uses) VALUES (?,?,?,?)",
                             (label, digest(key), expires, maximum)).lastrowid
+        record_history(db, "invite_created")
     return jsonify(id=invite, enrollment_key=key, expires=expires), 201
 
 
@@ -725,9 +985,11 @@ def revoke_invite(invite_id):
     with database() as db:
         admin(db)
         if invite_id > 2**63 - 1 or not db.execute(
-            "UPDATE enrollment_invites SET revoked=1 WHERE id=?", (invite_id,)
-        ).rowcount:
+            "SELECT 1 FROM enrollment_invites WHERE id=?", (invite_id,)
+        ).fetchone():
             abort(404)
+        if db.execute("UPDATE enrollment_invites SET revoked=1 WHERE id=? AND revoked=0", (invite_id,)).rowcount:
+            record_history(db, "invite_revoked")
     return jsonify(revoked=True)
 
 
@@ -776,6 +1038,18 @@ def manage_node(node_id, action):
     return jsonify(enabled=action == "enable")
 
 
+@app.post("/admin/nodes/<int:node_id>/revoke")
+def revoke_node(node_id):
+    payload()
+    with database() as db:
+        admin(db, owner=True)
+        _, released = change_nodes(db, [node_id], "disable")
+        if db.execute("UPDATE nodes SET revoked=1 WHERE id=? AND revoked=0", (node_id,)).rowcount:
+            db.execute("DELETE FROM project_nodes WHERE node=?", (node_id,))
+            record_history(db, "node_revoked", nodes=(node_id,), quantity=1, released=released)
+    return jsonify(revoked=True, released=released)
+
+
 @app.post("/admin/fleet/actions")
 def fleet_action():
     data = payload()
@@ -796,10 +1070,12 @@ def change_nodes(db, ids, action):
         abort(404, description="Nœud introuvable.")
     db.execute("BEGIN IMMEDIATE")
     placeholders = ",".join("?" for _ in ids)
-    rows = db.execute(f"SELECT id,enabled FROM nodes WHERE id IN ({placeholders})", ids).fetchall()
+    rows = db.execute(f"SELECT id,enabled,revoked FROM nodes WHERE id IN ({placeholders})", ids).fetchall()
     if len(rows) != len(ids):
         abort(404, description="Au moins un nœud de la sélection est introuvable.")
     enabled = action == "enable"
+    if enabled and any(row["revoked"] for row in rows):
+        abort(409, description="Un nœud révoqué doit être réinscrit avec une nouvelle identité.")
     changed = sorted(row["id"] for row in rows if bool(row["enabled"]) != enabled)
     if not changed:
         return 0, 0
@@ -857,7 +1133,7 @@ def submit_job():
     job_id = secrets.token_hex(16)
     with database() as db:
         db.execute("BEGIN IMMEDIATE")
-        project_id = project(db)
+        project_id = project(db, write=True)
         if request_key is not None:
             known = db.execute("SELECT fingerprint,job FROM job_requests WHERE project=? AND request_key=?",
                                (project_id, request_key)).fetchone()
@@ -868,16 +1144,8 @@ def submit_job():
                 response.headers["Idempotency-Replayed"] = "true"
                 return response, 202
         now = time.time()
-        if PILOT:
-            recent = db.execute("SELECT count(*) FROM jobs WHERE project=? AND created>=?",
-                                (project_id, now - 60)).fetchone()[0]
-            active = db.execute("""
-                SELECT count(*) FROM jobs j WHERE j.project=? AND EXISTS (
-                    SELECT 1 FROM tasks t WHERE t.job=j.id AND t.status IN ('queued','running')
-                )
-            """, (project_id,)).fetchone()[0]
-            if recent >= PILOT_JOBS_PER_MINUTE or active >= PILOT_ACTIVE_JOBS:
-                return jsonify(error="Quota de calcul du projet atteint."), 429, {"Retry-After": "60"}
+        if admission_error := check_admission(db, project_id, now):
+            return admission_error
         width = batch_width(db, project_id, values, now)
         db.execute("INSERT INTO jobs VALUES (?,?,?)", (job_id, project_id, now))
         if request_key is not None:
@@ -887,6 +1155,23 @@ def submit_job():
             for index in range(0, len(values), width)
         ))
     return jsonify(id=job_id, status="queued"), 202
+
+
+def check_admission(db, project_id, now):
+    policy = project_policy(db, project_id)
+    if not policy["admissions"]:
+        return jsonify(error="Le projet suspend l’admission de nouvelles demandes."), 409
+    if policy["max_active"] is not None:
+        recent = db.execute("SELECT count(*) FROM jobs WHERE project=? AND created>=?",
+                            (project_id, now - 60)).fetchone()[0]
+        active = db.execute("""
+            SELECT count(*) FROM jobs j WHERE j.project=? AND EXISTS (
+                SELECT 1 FROM tasks t WHERE t.job=j.id AND t.status IN ('queued','running')
+            )
+        """, (project_id,)).fetchone()[0]
+        if recent >= policy["per_minute"] or active >= policy["max_active"]:
+            return jsonify(error="Quota de calcul du projet atteint."), 429, {"Retry-After": "60"}
+    return None
 
 
 def expire(db, now):
@@ -930,21 +1215,131 @@ def get_job(job_id):
 def cancel_job(job_id):
     with database() as db:
         db.execute("BEGIN IMMEDIATE")
-        project_id = project(db)
+        project_id = project(db, write=True)
         if not db.execute("SELECT 1 FROM jobs WHERE id=? AND project=?", (job_id, project_id)).fetchone():
             abort(404)
-        if db.execute("SELECT 1 FROM job_cancellations WHERE job=?", (job_id,)).fetchone():
-            return jsonify(id=job_id, status="cancelled")
-        now = time.time()
-        expire(db, now)
-        changed = db.execute("""
-            UPDATE tasks SET status='cancelled',node=NULL,lease=NULL,expires=NULL
-            WHERE job=? AND status IN ('queued','running')
-        """, (job_id,)).rowcount
-        if not changed:
-            abort(409, description="Cette demande est déjà terminée ou en échec.")
-        db.execute("INSERT INTO job_cancellations VALUES (?,?)", (job_id, now))
+        cancel_active_job(db, job_id)
     return jsonify(id=job_id, status="cancelled")
+
+
+def cancel_active_job(db, job_id):
+    if db.execute("SELECT 1 FROM job_cancellations WHERE job=?", (job_id,)).fetchone():
+        return False
+    now = time.time()
+    expire(db, now)
+    changed = db.execute("""
+        UPDATE tasks SET status='cancelled',node=NULL,lease=NULL,expires=NULL
+        WHERE job=? AND status IN ('queued','running')
+    """, (job_id,)).rowcount
+    if not changed:
+        abort(409, description="Cette demande est déjà terminée ou en échec.")
+    db.execute("INSERT INTO job_cancellations VALUES (?,?)", (job_id, now))
+    return True
+
+
+@app.get("/admin/jobs")
+def jobs_page():
+    with database() as db:
+        admin(db)
+    return app.send_static_file("jobs.html")
+
+
+@app.get("/admin/jobs/data")
+def jobs_data():
+    query = request.args.get("q", "").strip().casefold()
+    state = request.args.get("status", "")
+    page = request.args.get("page", 1, type=int)
+    size = request.args.get("size", 25, type=int)
+    if len(query) > 100 or state not in ("", "queued", "running", "done", "failed", "cancelled") or (
+        size not in PAGE_SIZES or not 1 <= page <= 1_000_000
+    ):
+        abort(400, description="Filtres invalides.")
+    classified = """
+        WITH progress AS (
+            SELECT j.id,j.project,j.created,p.name AS project_name,count(*) AS total,
+                sum(t.status='done') AS completed, max(t.attempts) AS attempts,
+                CASE WHEN c.job IS NOT NULL THEN 'cancelled'
+                     WHEN max(t.status='failed') THEN 'failed'
+                     WHEN min(t.status='done') THEN 'done'
+                     WHEN min(t.status='queued') THEN 'queued'
+                     ELSE 'running' END AS status
+            FROM jobs j JOIN projects p ON p.id=j.project JOIN tasks t ON t.job=j.id
+            LEFT JOIN job_cancellations c ON c.job=j.id
+            WHERE (?='' OR instr(j.id,?)>0 OR instr(fold(p.name),?)>0)
+            GROUP BY j.id
+        )
+    """
+    matching = " WHERE (?='' OR status=?)"
+    params = (query, query, query, state, state)
+    with database() as db:
+        role = admin(db)
+        db.create_function("fold", 1, str.casefold, deterministic=True)
+        db.execute("BEGIN IMMEDIATE")
+        expire(db, time.time())
+        total = db.execute(classified + "SELECT count(*) FROM progress" + matching, params).fetchone()[0]
+        pages = max(1, (total + size - 1) // size)
+        page = min(page, pages)
+        rows = db.execute(classified + "SELECT * FROM progress" + matching +
+                          " ORDER BY created DESC,id DESC LIMIT ? OFFSET ?", (*params, size, (page-1)*size))
+        return jsonify(jobs=[dict(row) for row in rows], total=total, page=page, pages=pages, writable=role != "reader")
+
+
+@app.post("/admin/jobs/<job_id>/<any(cancel,retry):action>")
+def operate_job(job_id, action):
+    payload()
+    with database() as db:
+        admin(db)
+        db.execute("BEGIN IMMEDIATE")
+        job = db.execute("SELECT j.project,p.status FROM jobs j JOIN projects p ON p.id=j.project WHERE j.id=?",
+                         (job_id,)).fetchone()
+        if job is None:
+            abort(404, description="Demande introuvable.")
+        if action == "cancel":
+            if cancel_active_job(db, job_id):
+                record_history(db, "job_cancelled", projects=(job["project"],))
+            return jsonify(id=job_id, status="cancelled")
+        if job["status"] != "approved":
+            abort(409, description="Le projet doit être approuvé.")
+        if existing := db.execute("SELECT replacement FROM job_retries WHERE original=?", (job_id,)).fetchone():
+            return jsonify(id=existing["replacement"], status="queued", replayed=True)
+        if not db.execute("SELECT 1 FROM tasks WHERE job=? AND status IN ('failed','cancelled')", (job_id,)).fetchone():
+            abort(409, description="Seules les demandes en échec ou annulées peuvent être relancées.")
+        if admission_error := check_admission(db, job["project"], time.time()):
+            return admission_error
+        replacement = secrets.token_hex(16)
+        db.execute("INSERT INTO jobs VALUES (?,?,?)", (replacement, job["project"], time.time()))
+        db.execute("""
+            INSERT INTO tasks(job,position,input) SELECT ?,position,input FROM tasks WHERE job=?
+        """, (replacement, job_id))
+        db.execute("INSERT INTO job_retries VALUES (?,?)", (job_id, replacement))
+        record_history(db, "job_retried", projects=(job["project"],))
+    return jsonify(id=replacement, status="queued"), 201
+
+
+@app.get("/admin/operations")
+def operations_page():
+    with database() as db:
+        admin(db)
+    return app.send_static_file("operations.html")
+
+
+@app.get("/admin/operations/data")
+def operations_data():
+    now = time.time()
+    with database() as db:
+        admin(db)
+        db.execute("BEGIN")
+        oldest = db.execute("""
+            SELECT min(j.created) FROM tasks t JOIN jobs j ON j.id=t.job WHERE t.status='queued'
+        """).fetchone()[0]
+        tasks = {row[0]: row[1] for row in db.execute("SELECT status,count(*) FROM tasks GROUP BY status")}
+        versions = [dict(row) for row in db.execute("""
+            SELECT coalesce(agent_version,'inconnue') AS version,count(*) AS total
+            FROM nodes WHERE enabled=1 AND seen>=? GROUP BY agent_version ORDER BY total DESC,version
+        """, (now - ONLINE_SECONDS,))]
+        late = db.execute("SELECT count(*) FROM tasks WHERE status='running' AND expires<=?", (now,)).fetchone()[0]
+    return jsonify(mode=MODE, tasks=tasks, oldest_seconds=None if oldest is None else int(max(0, now-oldest)),
+                   expired_leases=late, versions=versions, capsule=CAPSULE, verification="fp16" if PILOT else "format")
 
 
 @app.route("/v1/node/network-probe", methods=["HEAD", "GET", "POST"])
@@ -1007,6 +1402,7 @@ def claim():
     device = field(data, "device", 160)
     hardware = field(data, "hardware", 160) if "hardware" in data else None
     supported = data.get("capsule") == CAPSULE
+    version = field(data, "agent_version", 32) if "agent_version" in data else None
     paused = data.get("paused", False)
     if type(paused) is not bool:
         abort(400, description="État du partage invalide.")
@@ -1014,8 +1410,8 @@ def claim():
         db.execute("BEGIN IMMEDIATE")
         node_id = node(db)
         now = time.time()
-        db.execute("UPDATE nodes SET seen=?,device=?,hardware=?,capsule=?,paused=? WHERE id=?",
-                   (now, device, hardware, CAPSULE if supported else None, paused, node_id))
+        db.execute("UPDATE nodes SET seen=?,device=?,hardware=?,capsule=?,paused=?,agent_version=? WHERE id=?",
+                   (now, device, hardware, CAPSULE if supported else None, paused, version, node_id))
         if "network" in data:
             update_network(db, node_id, now, data["network"])
         expire(db, now)
@@ -1031,12 +1427,13 @@ def claim():
         ), deterministic=True)
         task = db.execute("""
             SELECT t.job,t.position,t.input FROM tasks t JOIN jobs j ON t.job=j.id
+            LEFT JOIN project_policy p ON p.project=j.project
             WHERE t.status='queued' AND (
                 j.project=? OR (? IS NULL AND NOT EXISTS (
                     SELECT 1 FROM project_nodes WHERE project=j.project
                 ))
             ) AND fits_network_budget(length(t.input), json_array_length(t.input))
-            ORDER BY j.created,t.position LIMIT 1
+            ORDER BY j.created - 300 * coalesce(p.priority,0),j.created,t.position LIMIT 1
         """, (project_id, project_id)).fetchone()
         if task is None:
             return jsonify(task=None)

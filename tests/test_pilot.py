@@ -1,4 +1,7 @@
+import base64
+import hmac
 import tempfile
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -7,6 +10,7 @@ from unittest.mock import patch
 import server
 from capsule import CAPSULE
 from ops.backup import verified_copy
+from preferences import pause_reason
 
 
 class PilotTests(unittest.TestCase):
@@ -97,3 +101,72 @@ class PilotTests(unittest.TestCase):
             denied = self.client.post("/v1/jobs", json=self.payload, headers=self.headers | {"Idempotency-Key": "test-second"})
             self.assertEqual(denied.status_code, 429)
             self.assertIn("Retry-After", denied.headers)
+
+    def test_roles_totp_and_revocation(self):
+        response = self.client.post("/admin/access/accounts", auth=self.admin,
+                                    json={"name":"lecteur","role":"reader","mfa":True})
+        self.assertEqual(response.status_code, 201)
+        credentials = response.json
+        self.assertEqual(self.client.get("/admin/jobs/data", auth=("lecteur", credentials["password"])).status_code, 401)
+        counter = int(time.time() // 30)
+        hashed = hmac.digest(base64.b32decode(credentials["totp"]), counter.to_bytes(8, "big"), "sha1")
+        offset = hashed[-1] & 15
+        code = f"{(int.from_bytes(hashed[offset:offset+4], 'big') & 0x7fffffff) % 1_000_000:06d}"
+        with server.app.test_client() as reader:
+            data = {"name":"lecteur","password":credentials["password"],"code":code}
+            self.assertEqual(reader.post("/admin/session", json=data, base_url="https://localhost").status_code, 200)
+            self.assertEqual(reader.post("/admin/session", json=data, base_url="https://localhost").status_code, 401)
+            self.assertFalse(reader.get("/admin/jobs/data", base_url="https://localhost").json["writable"])
+            self.assertEqual(reader.post("/admin/enrollment-invites", base_url="https://localhost",
+                                         json={"label":"Interdit","hours":1,"max_uses":1}).status_code, 403)
+            self.assertEqual(self.client.post("/admin/access/accounts/lecteur/revoke", auth=self.admin, json={}).status_code, 200)
+            self.assertEqual(reader.get("/admin/jobs/data", base_url="https://localhost").status_code, 401)
+
+    def test_scoped_key_job_retry_and_node_revoke(self):
+        response = self.client.post("/admin/projects/1/keys", auth=self.admin,
+                                    json={"label":"lecture","scope":"read","days":1})
+        headers = {"Authorization": f"Bearer {response.json['api_key']}"}
+        job = self.client.post("/v1/jobs", json=self.payload, headers=self.headers).json["id"]
+        self.assertEqual(self.client.get(f"/v1/jobs/{job}", headers=headers).status_code, 200)
+        self.assertEqual(self.client.post("/v1/jobs", json=self.payload, headers=headers).status_code, 403)
+        self.assertEqual(self.client.post(f"/v1/jobs/{job}/cancel", headers=headers).status_code, 403)
+        self.assertEqual(self.client.post(f"/admin/jobs/{job}/cancel", json={}, auth=self.admin).status_code, 200)
+        retry = self.client.post(f"/admin/jobs/{job}/retry", json={}, auth=self.admin)
+        self.assertEqual(retry.status_code, 201)
+        self.assertEqual(self.client.post(f"/admin/jobs/{job}/retry", json={}, auth=self.admin).json["id"], retry.json["id"])
+        self.assertEqual(self.client.get("/admin/jobs/data?status=cancelled", auth=self.admin).json["total"], 1)
+        self.assertEqual(self.client.post("/admin/projects/1/keys/1/revoke", auth=self.admin, json={}).status_code, 200)
+        self.assertEqual(self.client.get(f"/v1/jobs/{job}", headers=headers).status_code, 401)
+        with server.database() as db:
+            db.execute("INSERT INTO nodes(name,secret) VALUES ('Poste',?)", (server.digest("node"),))
+        node_headers = {"Authorization":"Bearer node"}
+        heartbeat = {"device":"NPU","capsule":CAPSULE,"agent_version":"0.2.0"}
+        self.assertIsNotNone(self.client.post("/v1/node/claim", headers=node_headers, json=heartbeat).json["task"])
+        self.assertEqual(self.client.get("/admin/operations/data", auth=self.admin).json["versions"][0]["version"], "0.2.0")
+        self.assertEqual(self.client.post("/admin/nodes/1/revoke", auth=self.admin, json={}).json["released"], 1)
+        self.assertEqual(self.client.post("/admin/nodes/1/enable", auth=self.admin, json={}).status_code, 409)
+        self.assertEqual(self.client.post("/v1/node/claim", headers=node_headers, json=heartbeat).status_code, 401)
+        self.assertEqual(self.client.get("/admin/history/data?action=node_revoked", auth=self.admin).json["events"][0]["actor_name"], "superadmin")
+
+    def test_contribution_policy(self):
+        settings = {"paused":False,"ac_only":True,"schedule_start":"22:00","schedule_end":"07:00"}
+        self.assertIsNone(pause_reason(settings, 60, True))
+        self.assertEqual(pause_reason(settings, 480, True), "Hors plage horaire")
+        self.assertEqual(pause_reason(settings, 60, False), "En attente du secteur")
+        self.assertEqual(pause_reason(settings | {"paused":True}, 60, True), "Partage en pause")
+
+    def test_project_admission_and_priority(self):
+        policy = {"admissions": False, "max_active": 2, "per_minute": 10, "priority": 3}
+        self.assertEqual(self.client.post("/admin/projects/1/policy", auth=self.admin, json=policy).status_code, 200)
+        self.assertEqual(self.client.post("/v1/jobs", json=self.payload, headers=self.headers).status_code, 409)
+        self.assertEqual(self.client.post("/admin/projects/1/policy", auth=self.admin,
+                                         json=policy | {"admissions": True}).status_code, 200)
+        with server.database() as db:
+            db.execute("INSERT INTO projects(name,description,status,api_key) VALUES ('Autre','','approved',?)",
+                       (server.digest("other"),))
+            db.execute("INSERT INTO nodes(name,secret) VALUES ('Poste',?)", (server.digest("node"),))
+        self.client.post("/v1/jobs", json=self.payload, headers={"Authorization":"Bearer other"})
+        new = self.client.post("/v1/jobs", json=self.payload, headers=self.headers).json["id"]
+        claim = self.client.post("/v1/node/claim", json={"device":"NPU","capsule":CAPSULE},
+                                 headers={"Authorization":"Bearer node"})
+        self.assertEqual(claim.json["task"]["job"], new)
