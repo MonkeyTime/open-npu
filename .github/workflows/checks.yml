@@ -15,6 +15,13 @@ jobs:
       - run: python -m pip install --no-deps -r requirements-server.txt
       - run: python -m pip check
       - run: python -m unittest discover -s tests -v
+      - name: Verify Ubuntu deployment and redeployment
+        run: |
+          bash -n deploy/ubuntu.sh
+          sudo bash deploy/ubuntu.sh --domain localhost
+          first_secret=$(sudo sha256sum deploy/secrets/admin.txt)
+          sudo bash deploy/ubuntu.sh
+          test "$first_secret" = "$(sudo sha256sum deploy/secrets/admin.txt)"
   build-windows:
     runs-on: windows-latest
     steps:

@@ -43,8 +43,8 @@ services:
       - default
       - backend
     ports:
-      - "80:80"
-      - "443:443"
+      - "${OPEN_NPU_PORT_BIND:-}80:80"
+      - "${OPEN_NPU_PORT_BIND:-}443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

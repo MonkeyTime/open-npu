@@ -12,6 +12,10 @@ To package OpenVINO graphs separately or test the distributed decoder, see the [
 
 OPEN-NPU is a local prototype for volunteer computing. Research teams submit projects through the portal. The super administrator approves them and issues an API key for each project. Windows agents enroll automatically, poll the server, and run batches on Intel AI Boost with OpenVINO.
 
+## Deploy on Ubuntu
+
+Run `./deploy/ubuntu.sh --domain npu.example.org --admin-cidr 10.20.0.0/24` from the checkout. It installs missing dependencies, configures HTTPS, and checks that the portal is ready. See the [Ubuntu deployment guide](deploy/PILOTE.md#install-on-ubuntu) for DNS, administrator access, local testing, and redeployment.
+
 ## Use the local instance
 
 - Portal: `http://127.0.0.1:8787/`
