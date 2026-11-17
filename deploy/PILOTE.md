@@ -19,6 +19,14 @@ sudo docker compose --env-file deploy/.env -f deploy/compose.yaml exec -T edge \
 
 To deploy a later checkout, pull the changes and run `./deploy/ubuntu.sh` again. The script reuses `deploy/.env`, the administrator password, and the Docker volumes. Edit `deploy/.env` to change the hostname, administration CIDR, or enrollment setting. To diagnose startup, run `sudo docker compose --env-file deploy/.env -f deploy/compose.yaml logs --tail 80`.
 
+## Configure workstation enrollment
+
+**Public enrollment.** On the first Ubuntu deployment, run the script with `--public-enrollment`. For an existing instance, set `OPEN_NPU_PUBLIC_ENROLLMENT=1` in `deploy/.env` and rerun `./deploy/ubuntu.sh`. Build and publish the [signed Windows installer](../README.md#download-and-update-the-windows-agent) for the instance. Users select **Contribute**, download and run the installer, and join without an invitation. In **Fleet**, an administrator enables the workstation once it appears as **Awaiting approval**. A pending workstation receives no jobs.
+
+**Invitation-only enrollment.** Keep `OPEN_NPU_PUBLIC_ENROLLMENT=0`, the default. Use **Access → Node invitations** to issue expiring, limited-use invitations and deliver private enrollment packages. The administrator can also manage invitations via `/admin/enrollment-invites`. Invitations remain usable when public enrollment is open. To close public registration, set the flag back to `0` and redeploy. Manage previously enrolled nodes in **Fleet**.
+
+When building the signed public installer, set `-Server` to the instance's configured HTTPS origin, for example `https://npu.example.org`. The installer embeds this URL and the agent keeps it for work and update checks. If the same instance moves to a new IP, update DNS and preserve its state. To use a different hostname or instance, build an installer for that destination. The unsigned localhost release is for trials on the server computer.
+
 ## Prepare the staging environment
 
 The `pilot` mode keeps the Intel AI Boost demo capsule. At startup, it requires an allowed hostname and an external administrator secret. It disables enrollment with the shared local key. Route public services through the HTTPS reverse proxy and limit administration to the administrative network. Use `superadmin` to create named accounts in **Access**, then have operators sign in at `/login`. Enable TOTP when creating the accounts and send the password and TOTP secret over secure channels. Database backups contain TOTP secrets and must remain encrypted and private.
@@ -26,9 +34,9 @@ The `pilot` mode keeps the Intel AI Boost demo capsule. At startup, it requires 
 1. Choose the domain, the administrative VPN network, and a dedicated Linux host. Configure DNS, inbound HTTPS access, and persistent storage.
 2. Copy `deploy/pilot.env.example` to `deploy/.env`. Set the domain, the CIDR range Caddy actually sees, and the path to the administrator secret file. Put at least 32 random characters in the secret file. On Linux, make the file readable by the group of service account 10001. Check that the installed Compose version mounts it with the expected permissions.
 3. From `deploy`, run `docker compose config` and then `docker compose up --build -d` in staging. Verify the certificate and both health endpoints. Confirm that administration is accessible over the VPN and rejected from an external network.
-4. Create an invitation through `POST /admin/enrollment-invites`. For example, send `{"label":"Campus A","hours":24,"max_uses":5}`. Save the response to a private file and prepare the Windows package using the [signing procedure](../docs/CAPSULES.md#distribute-the-signed-windows-package). Distribute it to the selected computers. You can list and revoke invitations through the API. Labels help identify invitations in the console. Isolation by institution requires a separate control.
+4. [Choose an enrollment mode](#configure-workstation-enrollment) and test it on a Windows workstation. For invitation-only enrollment, create an invitation under **Access** or send `{"label":"Campus A","hours":24,"max_uses":5}` to `POST /admin/enrollment-invites`. Save the response to a private file and distribute a [signed private package](../docs/CAPSULES.md#distribute-the-signed-windows-package) to the selected workstations. Invitation labels help identify invitations in the console. Isolation by institution requires a separate control.
 5. Approve a test project, submit a job with a unique `Idempotency-Key`, and verify the result on several computers. After a connection interruption, retry with the same key and the same data. Cancel an active job with `POST /v1/jobs/{id}/cancel`. If you exceed the quota, the API returns HTTP 429 and `Retry-After`.
-6. In a test environment, revoke an invitation, pause a computer, disconnect a node from the network, and verify that the batch resumes.
+6. In a test environment, approve a public registration or revoke a private invitation, according to the chosen mode. Pause a computer, disconnect a node from the network, and verify that the batch resumes.
 
 ## Backup and recovery
 

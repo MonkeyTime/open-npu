@@ -38,6 +38,17 @@ For a local trial, select **Contribute** on the home page and download the Windo
 
 For a test on the server computer, generate the package with `./new-agent-package.ps1 -Server http://127.0.0.1:8787`, then run `./install-agent.ps1`. To distribute the agent to participants, use a [signed Windows package](docs/CAPSULES.md#distribute-the-signed-windows-package).
 
+### Choose an enrollment mode
+
+| Mode | How a workstation joins |
+|---|---|
+| Public enrollment | Volunteers use **Contribute** on the instance home page. The installer asks for no invitation. The node appears in the fleet as **Awaiting approval** until an administrator enables it. |
+| Invitation-only enrollment | An administrator creates a limited-use invitation under **Access → Node invitations** and distributes a private enrollment package to the selected workstations. This is the default for the Ubuntu pilot. |
+
+Invitations remain available when public enrollment is enabled for teams that use private packages. To require invitations for every new workstation, keep public enrollment disabled.
+
+The signed remote installer embeds the instance's HTTPS URL, for example `https://npu.example.org`. The agent saves that URL in `node.json` and uses it for enrollment, jobs, and update checks. A server IP change leaves the installer usable if DNS still points to the same instance and HTTPS remains valid. The local trial installer proposes `http://127.0.0.1:8787`, which refers to the workstation running the installer. See [enrollment on the Ubuntu pilot](deploy/PILOTE.md#configure-workstation-enrollment).
+
 The installer uses the current Windows profile, starts the agent in the background, and launches it again at sign-in. The computer name appears in the fleet as soon as it enrolls. Diagnostic logs are available at `%LOCALAPPDATA%\OPEN-NPU\agent.log`. Use `-NoStartup` to test without launching the agent at sign-in.
 
 The OPEN-NPU icon appears in the Windows notification area, next to the clock or under the hidden icons menu. Hover over it to see the agent's status. Right-click to enable or disable sharing, set the upload limit, open the log, or quit the agent. Pausing lets the current batch finish and keeps existing reservations. The agent cannot receive new assignments or reservations until it resumes.
@@ -86,7 +97,7 @@ The home page has separate forms for research workloads and hardware offers. Fin
 
 **Supervision** refreshes every five seconds while the tab is visible. It shows the fleet, active leases, recent events, and batches completed per minute from the time monitoring was enabled.
 
-Use **Access** to manage node invitations and named API keys with expiry dates and read-only or read-write permissions. Submitting or cancelling a job requires write access. Use **Calculations** to filter and page through requests, cancel a request, or retry a cancelled or failed request under a new ID. The details page for an approved project lets you pause admission and configure quotas and priority.
+Use **Access** to manage invitations for private enrollment and named API keys with expiry dates and read-only or read-write permissions. Submitting or cancelling a job requires write access. Use **Calculations** to filter and page through requests, cancel a request, or retry a cancelled or failed request under a new ID. The details page for an approved project lets you pause admission and configure quotas and priority.
 
 Search for nodes by name, ID, or accelerator. The counters filter the fleet by status, and the table shows 25 to 100 nodes per page. The console keeps your selection as you navigate or refresh. After reviewing the selection, you can disable or re-enable up to 100 nodes in one action.
 
