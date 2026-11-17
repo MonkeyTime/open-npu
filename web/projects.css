@@ -22,3 +22,5 @@
 #reserved-details { margin-top: .6rem; }
 #reserved-nodes { overflow-wrap: anywhere; }
 @media (max-width: 760px) { .project-grid:not([hidden]) { grid-template-columns: 1fr; } }
+.contribution-panel { margin-block-start: 1.5rem; }
+.contribution-panel td { overflow-wrap: anywhere; white-space: pre-line; }

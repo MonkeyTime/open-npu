@@ -1,29 +1,30 @@
+import { t, language } from "./i18n.js";
 import {api, element} from "./portal.js";
 
 const actions = {
-  node_enrolled: "Inscription automatique",
-  node_created: "Création manuelle",
-  enable: "Réactivation de nœuds",
-  disable: "Désactivation de nœuds",
-  project_approved: "Approbation du projet",
-  project_rejected: "Refus du projet",
-  project_updated: "Modification du projet",
-  key_rotated: "Remplacement de clé API",
-  nodes_reserved: "Réservation de nœuds",
-  reservation_released: "Libération de réservation",
-  invite_created: "Création d’invitation",
-  invite_revoked: "Révocation d’invitation",
-  admin_created: "Création d’un compte",
-  admin_revoked: "Révocation d’un compte",
-  key_created: "Création de clé API",
-  key_revoked: "Révocation de clé API",
-  node_revoked: "Révocation de nœud",
-  job_cancelled: "Annulation de calcul",
-  job_retried: "Relance de calcul",
-  project_policy_updated: "Modification de l’admission et de la priorité",
+  node_enrolled: t("Inscription automatique"),
+  node_created: t("Création manuelle"),
+  enable: t("Réactivation de nœuds"),
+  disable: t("Désactivation de nœuds"),
+  project_approved: t("Approbation du projet"),
+  project_rejected: t("Refus du projet"),
+  project_updated: t("Modification du projet"),
+  key_rotated: t("Remplacement de clé API"),
+  nodes_reserved: t("Réservation de nœuds"),
+  reservation_released: t("Libération de réservation"),
+  invite_created: t("Création d’invitation"),
+  invite_revoked: t("Révocation d’invitation"),
+  admin_created: t("Création d’un compte"),
+  admin_revoked: t("Révocation d’un compte"),
+  key_created: t("Création de clé API"),
+  key_revoked: t("Révocation de clé API"),
+  node_revoked: t("Révocation de nœud"),
+  job_cancelled: t("Annulation de calcul"),
+  job_retried: t("Relance de calcul"),
+  project_policy_updated: t("Modification de l’admission et de la priorité"),
 };
-const origins = {admin: "Administration", agent: "Agent"};
-const formatDate = new Intl.DateTimeFormat("fr-FR", {dateStyle: "short", timeStyle: "medium"});
+const origins = {admin: t("Administration"), agent: t("Agent")};
+const formatDate = new Intl.DateTimeFormat(language, {dateStyle: "short", timeStyle: "medium"});
 const find = (id) => document.getElementById(id);
 const form = find("history-filters");
 const previous = find("history-previous");
@@ -50,28 +51,27 @@ function midnight(value, extraDays = 0) {
 
 function effect(event) {
   const count = event.quantity ?? 0;
-  const plural = count === 1 ? "" : "s";
   switch (event.action) {
     case "node_enrolled":
-    case "node_created": return "Nœud ajouté à la flotte";
-    case "enable": return `${count} nœud${plural} réactivé${plural}`;
-    case "disable": return `${count} nœud${plural} désactivé${plural} · ${event.released} lot${event.released === 1 ? "" : "s"} remis en file`;
-    case "nodes_reserved": return `${count} nœud${plural} dans la nouvelle réservation`;
-    case "reservation_released": return `${count} nœud${plural} rendu${plural} au pool partagé`;
-    case "project_approved": return "Accès API accordé";
-    case "project_rejected": return "Projet classé comme refusé";
-    case "project_updated": return "Informations enregistrées";
-    case "key_rotated": return "Ancienne clé invalidée";
-    case "invite_created": return "Invitation disponible";
-    case "invite_revoked": return "Nouvelles inscriptions bloquées";
-    case "admin_created": return "Compte nominal créé";
-    case "admin_revoked": return "Accès administratif retiré";
-    case "key_created": return "Nouvel accès API";
-    case "key_revoked": return "Accès de cette clé retiré";
-    case "node_revoked": return `Identité invalidée · lots remis en file : ${event.released}`;
-    case "job_cancelled": return "Lots non terminés annulés";
-    case "job_retried": return "Nouvelle demande créée";
-    case "project_policy_updated": return "Nouvelles règles d’admission et de priorité";
+    case "node_created": return t("Nœud ajouté à la flotte");
+    case "enable": return t("Nœuds réactivés : {0}", count);
+    case "disable": return t("Nœuds désactivés : {0} · Lots remis en file : {1}", count, event.released);
+    case "nodes_reserved": return t("Nœuds dans la nouvelle réservation : {0}", count);
+    case "reservation_released": return t("Nœuds rendus au pool partagé : {0}", count);
+    case "project_approved": return t("Accès API accordé");
+    case "project_rejected": return t("Projet classé comme refusé");
+    case "project_updated": return t("Informations enregistrées");
+    case "key_rotated": return t("Ancienne clé invalidée");
+    case "invite_created": return t("Invitation disponible");
+    case "invite_revoked": return t("Nouvelles inscriptions bloquées");
+    case "admin_created": return t("Compte nominal créé");
+    case "admin_revoked": return t("Accès administratif retiré");
+    case "key_created": return t("Nouvel accès API");
+    case "key_revoked": return t("Accès de cette clé retiré");
+    case "node_revoked": return t("Identité invalidée · lots remis en file : {0}", event.released);
+    case "job_cancelled": return t("Lots non terminés annulés");
+    case "job_retried": return t("Nouvelle demande créée");
+    case "project_policy_updated": return t("Nouvelles règles d’admission et de priorité");
     default: return "—";
   }
 }
@@ -79,8 +79,8 @@ function effect(event) {
 function targets(event) {
   const cell = document.createElement("td");
   const entities = [
-    ...event.projects.map((project) => ({...project, prefix: "Projet", url: `/admin/projects/${project.id}`})),
-    ...event.nodes.map((node) => ({...node, prefix: "Nœud", url: `/admin?q=${node.id}#flotte`})),
+    ...event.projects.map((project) => ({...project, prefix: t("Projet"), url: `/admin/projects/${project.id}`})),
+    ...event.nodes.map((node) => ({...node, prefix: t("Nœud"), url: `/admin?q=${node.id}#flotte`})),
   ];
   if (!entities.length) {
     cell.textContent = "—";
@@ -97,8 +97,8 @@ function targets(event) {
   if (entities.length > 2) {
     const details = document.createElement("details");
     const pieces = [];
-    if (event.projects.length) pieces.push(`${event.projects.length} projet${event.projects.length === 1 ? "" : "s"}`);
-    if (event.nodes.length) pieces.push(`${event.nodes.length} nœud${event.nodes.length === 1 ? "" : "s"}`);
+    if (event.projects.length) pieces.push(t("Projets : {0}", event.projects.length));
+    if (event.nodes.length) pieces.push(t("Nœuds : {0}", event.nodes.length));
     details.append(element("summary", pieces.join(" · ")), list);
     cell.append(details);
   } else {
@@ -131,7 +131,7 @@ async function load() {
   const from = find("from").value;
   const until = find("until").value;
   if (from && until && from > until) {
-    notice("La date de fin doit suivre la date de début.", true);
+    notice(t("La date de fin doit suivre la date de début."), true);
     return;
   }
   if (from) params.set("from", midnight(from));
@@ -142,14 +142,14 @@ async function load() {
     if (request !== revision) return;
     page = data.page;
     pages = data.pages;
-    find("history-page").textContent = `Page ${page} sur ${pages}`;
-    find("history-total").textContent = `${data.total} action${data.total === 1 ? "" : "s"}`;
+    find("history-page").textContent = t("Page {0} sur {1}", page, pages);
+    find("history-total").textContent = t("Actions : {0}", data.total);
     previous.disabled = page <= 1;
     next.disabled = page >= pages;
     const rows = data.events.map(row);
     if (!rows.length) {
       const empty = document.createElement("tr");
-      const cell = element("td", "Aucune action ne correspond à ces filtres.", "muted");
+      const cell = element("td", t("Aucune action ne correspond à ces filtres."), "muted");
       cell.colSpan = 5;
       empty.append(cell);
       rows.push(empty);
@@ -157,7 +157,7 @@ async function load() {
     find("history-rows").replaceChildren(...rows);
     notice("");
   } catch (error) {
-    if (request === revision) notice(`Impossible de charger le journal. ${error.message}`, true);
+    if (request === revision) notice(t("Impossible de charger le journal. {0}", error.message), true);
   }
 }
 

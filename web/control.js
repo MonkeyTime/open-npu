@@ -1,10 +1,11 @@
+import { t, language } from "./i18n.js";
 import {api, element, handleForm} from "./portal.js";
 
 const byId = (id) => document.getElementById(id);
 const notice = byId("control-notice");
-const time = new Intl.DateTimeFormat("fr-FR", {dateStyle: "short", timeStyle: "short"});
-const labels = {queued: "En attente", running: "En cours", done: "Terminée", failed: "En échec", cancelled: "Annulée"};
-const roles = {owner: "Propriétaire", operator: "Opérateur", reader: "Lecture seule"};
+const time = new Intl.DateTimeFormat(language, {dateStyle: "short", timeStyle: "short"});
+const labels = {queued: t("En attente"), running: t("En cours"), done: t("Terminée"), failed: t("En échec"), cancelled: t("Annulée")};
+const roles = {owner: t("Propriétaire"), operator: t("Opérateur"), reader: t("Lecture seule")};
 const date = (seconds) => time.format(new Date(seconds * 1000));
 const actionDialog = byId("action-dialog");
 const credentialDialog = byId("credential-dialog");
@@ -23,7 +24,7 @@ function action(text, handler) {
 }
 
 function table(id, rows, width) {
-  if (!rows.length) rows = [["", "Aucun élément."]];
+  if (!rows.length) rows = [["", t("Aucun élément.")]];
   byId(id).replaceChildren(...rows.map((values) => {
     const row = document.createElement("tr");
     if (values.length !== width) {
@@ -68,27 +69,61 @@ credentialDialog?.addEventListener("close", () => { byId("credential-value").val
 function access() {
   const invite = byId("invite-form");
   const lookup = byId("lookup-form");
+  const choice = lookup.elements.project;
+  const search = lookup.elements.search;
   const key = byId("key-form");
   const accounts = byId("account-form");
   let projectId;
+  let projectName;
   let role = "reader";
+  let searchVersion = 0;
+  let keysVersion = 0;
+  let searchTimer;
+
+  async function listProjects() {
+    const version = ++searchVersion;
+    const term = search.value.trim();
+    const params = new URLSearchParams({status: "approved", size: "25", q: term});
+    const data = await api(`/admin/projects/data?${params}`);
+    if (version !== searchVersion) return;
+    const selected = choice.value || (projectId ? String(projectId) : "");
+    const former = [...choice.options].find((option) => option.value === selected);
+    const choices = data.projects.map((project) => {
+      const option = element("option", t("{0} (#{1})", project.name, project.id));
+      option.value = String(project.id);
+      option.dataset.name = project.name;
+      return option;
+    });
+    if (former && selected && !choices.some((option) => option.value === selected)) choices.unshift(former);
+    const placeholder = element("option", t("Choisir un projet"));
+    placeholder.value = "";
+    choice.replaceChildren(placeholder, ...choices);
+    choice.value = selected;
+    const note = byId("project-lookup-note");
+    note.textContent = data.total > data.projects.length
+      ? t("{0} projets sur {1}. Affinez la recherche.", data.projects.length, data.total)
+      : data.total === 0 ? (term ? t("Aucun projet approuvé ne correspond à la recherche.") : t("Aucun projet approuvé.")) : "";
+  }
 
   async function refreshKeys(id = projectId) {
     if (!id) return;
+    const version = ++keysVersion;
     const data = await api(`/admin/projects/${id}/keys`);
+    if (version !== keysVersion) return;
     projectId = id;
-    byId("keys-title").textContent = `Clés API · Projet #${id}`;
+    projectName = choice.selectedOptions[0]?.dataset.name ?? projectName;
+    byId("keys-title").textContent = projectName ? t("Clés API · {0} (#{1})", projectName, id) : t("Clés API · Projet #{0}", id);
     key.hidden = role === "reader";
     byId("key-table").hidden = false;
     table("key-rows", data.keys.map((item) => {
       const active = !item.revoked && item.expires > Date.now() / 1000;
-      return [`#${item.id} · ${item.label}`, item.scope === "read" ? "Lecture" : "Lecture et écriture",
-        date(item.expires), item.revoked ? "Révoquée" : active ? "Active" : "Expirée",
-        active && role !== "reader" ? action("Révoquer", () => confirmAction("Révoquer la clé ?",
-          "Les clients qui utilisent cette clé perdront l’accès immédiatement.", async () => {
+      return [`#${item.id} · ${item.label}`, item.scope === "read" ? t("Lecture") : t("Lecture et écriture"),
+        date(item.expires), item.revoked ? t("Révoquée") : active ? t("Active") : t("Expirée"),
+        active && role !== "reader" ? action(t("Révoquer"), () => confirmAction(t("Révoquer la clé ?"),
+          t("Les clients qui utilisent cette clé perdront l’accès immédiatement."), async () => {
             await api(`/admin/projects/${id}/keys/${item.id}/revoke`, {});
             await refreshKeys(id);
-            message("Clé révoquée.");
+            message(t("Clé révoquée."));
           })) : null];
     }), 5);
   }
@@ -99,63 +134,91 @@ function access() {
     invite.hidden = role === "reader";
     accounts.hidden = role !== "owner";
     byId("accounts-table").hidden = role !== "owner";
-    byId("account-info").textContent = `Connecté en tant que ${access.username} · ${roles[role]}`;
+    byId("account-info").textContent = t("Connecté en tant que {0} · {1}", access.username, roles[role]);
     byId("logout").hidden = access.username === "superadmin";
     table("invite-rows", invitations.invites.map((item) => [
       `#${item.id} · ${item.label}`, date(item.expires), `${item.uses} / ${item.max_uses}`,
-      item.revoked ? "Révoquée" : item.expires <= Date.now() / 1000 ? "Expirée" : item.uses >= item.max_uses ? "Utilisée" : "Active",
-      !item.revoked && role !== "reader" ? action("Révoquer", () => confirmAction("Révoquer l’invitation ?",
-        "Les postes déjà inscrits restent enregistrés.", async () => {
+      item.revoked ? t("Révoquée") : item.expires <= Date.now() / 1000 ? t("Expirée") : item.uses >= item.max_uses ? t("Utilisée") : t("Active"),
+      !item.revoked && role !== "reader" ? action(t("Révoquer"), () => confirmAction(t("Révoquer l’invitation ?"),
+        t("Les postes déjà inscrits restent enregistrés."), async () => {
           await api(`/admin/enrollment-invites/${item.id}/revoke`, {});
           await load();
-          message("Invitation révoquée.");
+          message(t("Invitation révoquée."));
         })) : null,
     ]), 5);
     table("account-rows", access.accounts.map((account) => [
-      account.name, roles[account.role], account.mfa ? "Activé" : "Désactivé", account.revoked ? "Révoqué" : "Actif",
-      !account.revoked && account.name !== access.username ? action("Révoquer", () => confirmAction("Révoquer le compte ?",
-        `Le compte ${account.name} perdra son accès à l’administration.`, async () => {
+      account.name, roles[account.role], account.mfa ? t("Activé") : t("Désactivé"), account.revoked ? t("Révoqué") : t("Actif"),
+      !account.revoked && account.name !== access.username ? action(t("Révoquer"), () => confirmAction(t("Révoquer le compte ?"),
+        t("Le compte {0} perdra son accès à l’administration.", account.name), async () => {
           await api(`/admin/access/accounts/${encodeURIComponent(account.name)}/revoke`, {});
           await load();
-          message("Compte révoqué.");
+          message(t("Compte révoqué."));
         })) : null,
     ]), 5);
+    await listProjects();
     await refreshKeys();
   }
 
   handleForm(invite, notice, async (data) => {
     const issued = await api("/admin/enrollment-invites", {...data, hours: Number(data.hours), max_uses: Number(data.max_uses)});
-    reveal("Invitation à placer dans un fichier JSON privé", JSON.stringify({enrollment_key: issued.enrollment_key}, null, 2));
+    reveal(t("Invitation à placer dans un fichier JSON privé"), JSON.stringify({enrollment_key: issued.enrollment_key}, null, 2));
     await load();
   });
   handleForm(accounts, notice, async (data) => {
     const issued = await api("/admin/access/accounts", {...data, mfa: data.mfa === "on"});
     const credentials = issued.totp
-      ? `Mot de passe : ${issued.password}\nClé à ajouter dans l’application d’authentification (TOTP, 6 chiffres, 30 s) : ${issued.totp}`
+      ? t("Mot de passe : {0}\nClé à ajouter dans l’application d’authentification (TOTP, 6 chiffres, 30 s) : {1}", issued.password, issued.totp)
       : issued.password;
-    reveal(`Accès pour ${issued.username}`, credentials);
+    reveal(t("Accès pour {0}", issued.username), credentials);
     await load();
   });
   handleForm(key, notice, async (data) => {
     const issued = await api(`/admin/projects/${projectId}/keys`, {...data, days: Number(data.days)});
-    reveal("Clé API du projet", issued.api_key);
+    reveal(t("Clé API du projet"), issued.api_key);
     await refreshKeys();
   });
   byId("logout").addEventListener("click", async () => {
     try { await api("/admin/session/logout", {}); location.assign("/login"); }
     catch (error) { message(error.message, true); }
   });
-  lookup.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try { await refreshKeys(Number(lookup.elements.project.value)); message(); }
+  async function chooseProject() {
+    keysVersion++;
+    projectId = undefined;
+    projectName = undefined;
+    key.hidden = true;
+    byId("key-table").hidden = true;
+    byId("keys-title").textContent = t("Clés API par projet");
+    if (!choice.value) return;
+    try { await refreshKeys(Number(choice.value)); message(); }
     catch (error) { message(error.message, true); }
+  }
+  lookup.addEventListener("submit", (event) => {
+    event.preventDefault();
+    chooseProject();
+  });
+  choice.addEventListener("change", chooseProject);
+  search.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchVersion++;
+    searchTimer = setTimeout(() => listProjects().catch((error) => message(error.message, true)), 250);
   });
   const initial = new URLSearchParams(location.search).get("project");
-  if (initial && /^[1-9][0-9]{0,14}$/.test(initial)) {
-    projectId = Number(initial);
-    lookup.elements.project.value = initial;
-  }
-  return load;
+  return async () => {
+    if (!choice.dataset.initialized && initial && /^[1-9][0-9]{0,14}$/.test(initial)) {
+      choice.dataset.initialized = "true";
+      const project = await api(`/admin/projects/${initial}/data`);
+      if (project.status === "approved") {
+        projectId = project.id;
+        projectName = project.name;
+        const option = element("option", t("{0} (#{1})", project.name, project.id));
+        option.value = initial;
+        option.dataset.name = project.name;
+        choice.append(option);
+        choice.value = initial;
+      }
+    }
+    return load();
+  };
 }
 
 function jobs() {
@@ -177,19 +240,19 @@ function jobs() {
     pages = data.pages;
     previous.disabled = page <= 1;
     next.disabled = page >= pages;
-    byId("job-page").textContent = `${data.total} demande(s) · Page ${page} sur ${pages}`;
+    byId("job-page").textContent = t("{0} demande(s) · Page {1} sur {2}", data.total, page, pages);
     table("job-rows", data.jobs.map((job) => {
       const project = element("a", job.project_name, "project-directory-link");
       project.href = `/admin/projects/${job.project}`;
       const current = ["queued", "running"].includes(job.status);
       const canRetry = ["failed", "cancelled"].includes(job.status);
-      const verb = current ? "Annuler" : "Relancer";
+      const verb = current ? t("Annuler") : t("Relancer");
       const control = data.writable && (current || canRetry) ? action(verb, () => confirmAction(
-        `${verb} cette demande ?`, current ? "Les lots non terminés seront annulés." : "Une nouvelle demande reprendra les mêmes entrées.",
+        t("{0} cette demande ?", verb), current ? t("Les lots non terminés seront annulés.") : t("Une nouvelle demande reprendra les mêmes entrées."),
         async () => {
           const result = await api(`/admin/jobs/${job.id}/${current ? "cancel" : "retry"}`, {});
           await load();
-          message(current ? "Demande annulée." : `Demande créée : ${result.id}`);
+          message(current ? t("Demande annulée.") : t("Demande créée : {0}", result.id));
         })) : null;
       return [job.id, project, date(job.created), labels[job.status], `${job.completed} / ${job.total}`, control];
     }), 6);
@@ -202,30 +265,7 @@ function jobs() {
   return load;
 }
 
-function metrics(id, pairs) {
-  byId(id).replaceChildren(...pairs.map(([label, value]) => {
-    const row = document.createElement("div");
-    row.append(element("dt", label), element("dd", value));
-    return row;
-  }));
-}
-
-function operations() {
-  async function load() {
-    const data = await api("/admin/operations/data");
-    metrics("instance-metrics", [
-      ["Mode", data.mode], ["Capsule", data.capsule], ["Contrôle des résultats", data.verification],
-      ["Âge du plus ancien lot en attente", data.oldest_seconds === null ? "—" : `${data.oldest_seconds} s`],
-      ["Baux expirés en attente de reprise", data.expired_leases],
-    ]);
-    metrics("task-metrics", Object.entries(labels).map(([key, label]) => [label, data.tasks[key] ?? 0]));
-    metrics("version-metrics", data.versions.length ? data.versions.map((item) => [item.version, item.total]) : [["Aucun agent en ligne", "—"]]);
-  }
-  setInterval(() => { if (!document.hidden) load().then(() => message(), (error) => message(error.message, true)); }, 15000);
-  return load;
-}
-
-const views = {access, jobs, operations};
+const views = {access, jobs};
 const load = views[byId("admin").dataset.control]();
 const refresh = () => load().then(() => message(), (error) => message(error.message, true));
 byId("refresh-control").addEventListener("click", refresh);

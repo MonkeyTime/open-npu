@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Documentation officielle de l’API OPEN-NPU pour les équipes de recherche." data-i18n-content="b0ca302e39cb">
+  <title data-i18n="dceb9f4c59fb">Documentation API · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/landing.css">
+  <link rel="stylesheet" href="/assets/api-docs.css">
+  <script type="module" src="/assets/api-docs.js"></script>
+</head>
+<body class="public">
+  <a class="skip" href="#documentation" data-i18n="c25561a0b257">Aller à la documentation</a>
+  <header class="site-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <a href="/docs/openapi.json" data-i18n="971b40eea472">Contrat OpenAPI (JSON) ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
+  </header>
+  <main class="wrap api-docs" id="documentation">
+    <div class="api-intro">
+      <p class="eyebrow" data-i18n="fcd068a9ca9f">Référence pour les équipes de recherche</p>
+      <h1 data-i18n="7385434663b2">Documentation API</h1>
+      <p class="lead" data-i18n="572ba387c292">Soumettez un calcul, suivez son avancement et récupérez les résultats de votre projet approuvé.</p>
+      <dl class="api-instance"><div><dt data-i18n="1128f49f8965">URL de base de cette instance</dt><dd><code id="base-url">Adresse de ce portail</code></dd></div>
+        <div><dt data-i18n="c3afcaf6efd5">Versions des routes</dt><dd data-i18n="6178027e4a09"><code>/v1</code> et <code>/v2</code></dd></div>
+      </dl>
+    </div>
+    <nav class="api-toc" aria-label="Sommaire" data-i18n-aria-label="729028ddffb7"><a href="#acces" data-i18n="ad64b73f553b">Accès</a><a href="#routes" data-i18n="2c5b669bcdeb">Routes</a><a href="#exemple" data-i18n="a074a74ec540">Premier calcul</a><a href="#capsules" data-i18n="10df314ace29">Capsules signées</a><a href="#erreurs" data-i18n="bc413d342511">Erreurs et limites</a></nav>
+    <section class="section" id="acces">
+      <h2 data-i18n="b94fa9ba80a4">Obtenir l’accès</h2>
+      <p data-i18n="b60cd73d93b0"><a href="/#proposer">Déposez une proposition</a> sur le portail de votre établissement. Après approbation, l’administrateur vous communique la clé API par un canal sécurisé. L’API utilise la même adresse que ce portail. En local, une adresse <code>127.0.0.1</code> est accessible depuis le poste qui héberge le serveur.</p>
+      <p data-i18n="bdebd5fffb7f">Pour chaque requête, envoyez la clé dans l’en-tête <code>Authorization: Bearer VOTRE_CLÉ</code>. Une clé en lecture seule permet de consulter les demandes. Pour soumettre ou annuler, utilisez une clé avec droits d’écriture.</p>
+    </section>
+    <section class="section" id="routes">
+      <h2 data-i18n="eb5b8826b0e3">Routes disponibles</h2>
+      <div class="api-table" role="region" aria-label="Routes de calcul" tabindex="0" data-i18n-aria-label="451833df8093">
+        <table>
+          <thead><tr><th scope="col" data-i18n="6b37faa20867">Méthode</th><th scope="col" data-i18n="adc74704d65d">Route</th><th scope="col" data-i18n="9af799d8b344">Utilisation</th></tr></thead>
+          <tbody>
+            <tr><td><code class="method post">POST</code></td><td><code>/v1/jobs</code></td><td data-i18n="17f272800a09">Soumettre un calcul et recevoir son identifiant. Réponse <code>202</code>.</td></tr>
+            <tr><td><code class="method get">GET</code></td><td><code>/v1/jobs/{job_id}</code></td><td data-i18n="bd30d86d7628">Consulter le statut ou récupérer les résultats.</td></tr>
+            <tr><td><code class="method post">POST</code></td><td><code>/v1/jobs/{job_id}/cancel</code></td><td data-i18n="f3a1df168947">Annuler une demande en attente ou en cours.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p data-i18n="d7f00c0a626d"><code>job_id</code> est l’identifiant renvoyé lors de la soumission. Gardez-le pour interroger ou annuler ce calcul.</p>
+    </section>
+    <section class="section" id="exemple">
+      <h2 data-i18n="1d6834230563">Lancer un premier calcul</h2>
+      <p data-i18n="6d1f85c20ead">La capsule <code>square-fp16-v1</code> accepte entre 1 et 4&nbsp;096 nombres compris entre −200 et 200. Elle calcule leurs carrés en FP16 et renvoie les résultats dans l’ordre d’entrée.</p>
+      <p data-i18n="455762953105">Définissez la variable d’environnement <code>OPEN_NPU_API_KEY</code> dans votre terminal avant d’exécuter l’exemple. Gardez-la hors des scripts partagés et des dépôts.</p>
+      <p data-i18n="docs.demo-prerequisites">Prérequis : une clé d’un projet approuvé et un agent NPU compatible disponible pour ce projet.</p>
+      <p><a class="project-contract" href="/assets/demo-compute.ps1" download="demo-compute.ps1" data-i18n="docs.demo-download">Télécharger le script de démonstration PowerShell</a></p>
+      <p data-i18n="docs.demo-result">Le script soumet trois valeurs, attend la fin du calcul et vérifie que le résultat est [4, 9, 16].</p>
+      <pre><code id="demo-command"></code></pre>
+      <details open><summary>PowerShell</summary><pre><code id="powershell-example"></code></pre></details>
+      <details><summary data-i18n="0765fdb256dc">Linux ou macOS · curl</summary><pre><code id="curl-example"></code></pre></details>
+      <p data-i18n="2ec9e69bdcb2">Interrogez périodiquement la demande jusqu’à atteindre un état final. Les états <code>queued</code> et <code>running</code> indiquent une demande active. Les états finaux sont <code>done</code>, <code>failed</code> et <code>cancelled</code>.</p>
+      <pre><code>{
+  "id": "aabbcc00112233445566778899aabbcc",
+  "status": "done",
+  "values": [4, 9, 16]
+}</code></pre>
+      <p data-i18n="afe8941491b5">Pour rejouer une soumission après une erreur de réseau, réutilisez la même valeur de l’en-tête <code>Idempotency-Key</code> avec les mêmes données. L’API renvoie le même identifiant.</p>
+    </section>
+    <section class="section" id="capsules">
+      <h2 data-i18n="8a30f9358cb8">Capsules signées et calculs par étapes</h2>
+      <p data-i18n="16938a0f84e7"><code>GET /v2/capsules</code> liste les versions approuvées et leurs contrats de tenseurs. Utilisez la même clé de projet que pour l’API v1.</p>
+      <p data-i18n="3bb36fd7e78c"><code>POST /v2/jobs</code> soumet une version précise. Pour un décodeur, envoyez des identifiants de tokens correspondant au tokenizer du modèle et le nombre maximum de nouveaux tokens.</p>
+      <pre><code>{
+  "capsule": "tiny-decoder",
+  "version": 1,
+  "tokens": [1, 4],
+  "max_new_tokens": 3,
+  "distinct_nodes": true
+}</code></pre>
+      <p data-i18n="aa496d9d02db"><code>GET /v2/jobs/{job_id}</code> renvoie l’état, l’étape et les tokens générés. Avec <code>distinct_nodes</code>, chaque étape exige un nœud distinct. Pour un test sur un seul poste, utilisez <code>false</code>.</p>
+      <p data-i18n="6f08622f463e"><code>verify_results: true</code> fait recalculer chaque étape par un second nœud compatible. Une divergence met la demande en échec. <code>POST /v2/jobs/{job_id}/cancel</code> annule une demande en attente ou en calcul.</p>
+      <p data-i18n="bc0c2f0ac66e">Pour une capsule de type <code>tensor</code>, envoyez <code>values</code> à la place des tokens et récupérez la sortie binaire little-endian via <code>GET /v2/jobs/{job_id}/result</code>.</p>
+    </section>
+    <section class="section" id="erreurs">
+      <h2 data-i18n="bc413d342511">Erreurs et limites</h2>
+      <dl class="api-errors">
+        <div><dt data-i18n="7825985e7e84"><code>400</code> ou <code>415</code></dt><dd data-i18n="2a7dd11d8536">Vérifiez le corps et l’en-tête <code>Content-Type: application/json</code> à la soumission.</dd></div>
+        <div><dt data-i18n="7825985e7e84"><code>401</code> ou <code>403</code></dt><dd data-i18n="2cbd0f238c9d">Vérifiez que la clé est active et autorise l’opération.</dd></div>
+        <div><dt><code>404</code></dt><dd data-i18n="a8b91d255550">Vérifiez l’identifiant de la demande et le projet auquel la clé appartient.</dd></div>
+        <div><dt><code>409</code></dt><dd data-i18n="137b34794112">Vérifiez les règles d’admission du projet, l’état de la demande ou la réutilisation de la clé d’idempotence pour un contenu différent.</dd></div>
+        <div><dt><code>429</code></dt><dd data-i18n="bbeb5d33639b">Le quota du projet est atteint. Attendez le délai indiqué par <code>Retry-After</code>.</dd></div>
+      </dl>
+      <a class="project-contract" href="/docs/openapi.json" data-i18n="3ad80be0981f">Consulter le contrat OpenAPI (JSON) ↗</a>
+    </section>
+  </main>
+</body>
+</html>

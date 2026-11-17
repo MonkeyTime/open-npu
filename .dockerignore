@@ -1,9 +1,13 @@
 **
 !server.py
 !capsule.py
+!capsule_manifest.py
+!capsule_pipeline.py
 !network.py
 !requirements-server.txt
 !web/
 !web/**
+!docs/
+!docs/openapi.json
 !deploy/
 !deploy/Dockerfile

@@ -1,0 +1,7 @@
+import { t } from "./i18n.js";
+
+const origin = location.origin;
+document.getElementById('base-url').textContent = origin;
+document.getElementById("demo-command").textContent = `.\\demo-compute.ps1 -Server "${origin}"`;
+document.getElementById('powershell-example').textContent = "$base = \"__ORIGIN__\"\n$headers = @{ Authorization = \"Bearer $env:OPEN_NPU_API_KEY\" }\n$headers[\"Idempotency-Key\"] = [guid]::NewGuid().ToString()\n$body = @{ capsule = \"square-fp16-v1\"; values = @(2, -3, 4) } | ConvertTo-Json -Compress\n$job = Invoke-RestMethod \"$base/v1/jobs\" -Method Post -Headers $headers -ContentType \"application/json\" -Body $body\nInvoke-RestMethod \"$base/v1/jobs/$($job.id)\" -Headers $headers\n# __CANCEL_COMMENT__\n# Invoke-RestMethod \"$base/v1/jobs/$($job.id)/cancel\" -Method Post -Headers $headers".replace('__ORIGIN__', origin).replace('__CANCEL_COMMENT__', () => t("Pour annuler une demande encore active :"));
+document.getElementById('curl-example').textContent = "BASE='__ORIGIN__'\nREQUEST_ID=\"$(uuidgen | tr '[:upper:]' '[:lower:]')\"\ncurl -fsS \"$BASE/v1/jobs\" \\\n  -H \"Authorization: Bearer $OPEN_NPU_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Idempotency-Key: $REQUEST_ID\" \\\n  --data '{\"capsule\":\"square-fp16-v1\",\"values\":[2,-3,4]}'\n\n# __ID_COMMENT__\nJOB_ID='returned_job_id'\ncurl -fsS \"$BASE/v1/jobs/$JOB_ID\" \\\n  -H \"Authorization: Bearer $OPEN_NPU_API_KEY\"".replace('__ORIGIN__', origin).replace('__ID_COMMENT__', () => t("Remplacez la valeur ci-dessous par le champ id de la réponse."));

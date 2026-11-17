@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n="e40fd14daef8">Capsules · OPEN-NPU</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/control.css">
+  <script type="module" src="/assets/capsules.js"></script>
+</head>
+<body class="console">
+  <header class="console-header">
+    <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" aria-current="page" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
+  </header>
+  <main id="admin">
+    <div class="console-heading"><div><p class="section-label" data-i18n="4b42c6690ebe">Administration</p><h1 data-i18n="777afcc490ac">Capsules OpenVINO</h1></div><button class="secondary" type="button" id="refresh-capsules" data-i18n="d7d646faaecb">Actualiser</button></div>
+    <p id="capsule-notice" role="status"></p>
+    <div class="control-grid">
+      <section class="panel" aria-labelledby="catalog-heading">
+        <div class="fleet-title"><h2 id="catalog-heading" data-i18n="374262156f6f">Catalogue signé</h2><a href="/docs/api#capsules" class="project-directory-link" data-i18n="0ed46a4abeb9">API des capsules ↗</a></div>
+        <p id="catalog-help" class="muted" data-i18n="e299f9cab4e4">Approuvez une version importée pour permettre son exécution.</p>
+        <div class="table-scroll" role="region" tabindex="0" aria-label="Catalogue des capsules" data-i18n-aria-label="e6dcbd80f20c">
+          <table><thead><tr><th data-i18n="51ee757a7bfb">Capsule</th><th data-i18n="dd167905de0d">Version</th><th data-i18n="baaddf70fb5d">Type</th><th data-i18n="1c5fe030e792">Étapes</th><th data-i18n="de4dd03297a1">État</th><th data-i18n="64cff1319d2f">Action</th></tr></thead><tbody id="catalog-rows"></tbody></table>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="pipeline-heading">
+        <div class="fleet-title"><h2 id="pipeline-heading" data-i18n="9f10370b005a">Calculs par étapes</h2><span id="capsule-workers" class="muted"></span></div>
+        <div class="table-scroll" role="region" tabindex="0" aria-label="Calculs par étapes" data-i18n-aria-label="9f10370b005a">
+          <table><thead><tr><th data-i18n="e79fa141dd58">Demande</th><th data-i18n="9c466199f8ec">Projet</th><th data-i18n="51ee757a7bfb">Capsule</th><th data-i18n="de4dd03297a1">État</th><th data-i18n="194421837657">Étape</th><th data-i18n="36b19816b6c0">Nœuds affectés</th><th data-i18n="64cff1319d2f">Action</th></tr></thead><tbody id="pipeline-rows"></tbody></table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <dialog id="capsule-dialog">
+    <h2 id="dialog-title"></h2><p id="dialog-description"></p>
+    <form method="dialog" class="dialog-actions">
+      <button value="cancel" class="secondary" data-i18n="46ad3916f6a0">Annuler</button><button value="confirm" data-i18n="30a8b7846961">Confirmer</button>
+    </form>
+  </dialog>
+</body>
+</html>

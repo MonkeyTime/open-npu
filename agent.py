@@ -1,6 +1,7 @@
 """Agent Windows OPEN-NPU. Le seul graphe exécutable est intégré au binaire."""
 
 import argparse
+from multiprocessing import freeze_support
 import ctypes
 from datetime import datetime
 import json
@@ -15,12 +16,14 @@ import socket
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 import numpy as np
 from openvino import Core, Model, Type, opset13
 
 from capsule import CAPSULE, WIDTH, valid_values
+from capsule_worker import CapsuleWorker
+from agent_updates import AgentUpdates
 from network import (MAX_RATE, MIN_UPLOAD_LIMIT, PROBE_BYTES, PROBE_INTERVAL, estimate_mbps,
                      optional_number, paced_body)
 from preferences import Preferences, pause_reason, save_json
@@ -33,7 +36,8 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 HTTP = build_opener(NoRedirect)
-AGENT_VERSION = "0.2.0"
+UPDATE_HTTP = build_opener(ProxyHandler({}), NoRedirect)
+AGENT_VERSION = "0.3.6"
 
 
 class SystemPowerStatus(ctypes.Structure):
@@ -75,8 +79,8 @@ def calculate(compiled, values):
     return compiled([tensor])[compiled.output(0)][0, :len(values)].astype(float).tolist()
 
 
-def request_bytes(config, route, body=None, *, credential="token", content_type=None, method=None, limit=None):
-    headers = {"Authorization": f"Bearer {config[credential]}"}
+def open_request(config, route, body=None, *, credential="token", content_type=None, method=None, limit=None, headers=None):
+    headers = (headers or {}) | {"Authorization": f"Bearer {config[credential]}"}
     if body is not None:
         headers["Content-Type"] = content_type
         headers["Content-Length"] = str(len(body))
@@ -86,7 +90,11 @@ def request_bytes(config, route, body=None, *, credential="token", content_type=
         config["server"].rstrip("/") + route,
         data=body, headers=headers, method=method,
     )
-    with HTTP.open(request, timeout=15) as response:
+    return HTTP.open(request, timeout=15)
+
+
+def request_bytes(config, route, body=None, **options):
+    with open_request(config, route, body, **options) as response:
         return response.read()
 
 
@@ -106,14 +114,15 @@ def load_config(path):
     for key in ("token", "enrollment_key"):
         if key in config and (not isinstance(config[key], str) or not config[key]):
             raise ValueError(f"Configuration invalide ({key}).")
-    if not config.get("token") and not config.get("enrollment_key"):
+    if not config.get("token") and not config.get("enrollment_key") and config.get("public_enrollment") is not True:
         raise ValueError("Identité et clé d’inscription manquantes.")
     optional_number(config.get("upload_limit_mbps"), MIN_UPLOAD_LIMIT, MAX_RATE)
     return config
 
 
 def enroll(config, path, stop):
-    if "enrollment_key" not in config:
+    public = config.get("public_enrollment") is True
+    if "enrollment_key" not in config and not public:
         return
     if "token" not in config:
         config["token"] = secrets.token_urlsafe(32)
@@ -121,7 +130,14 @@ def enroll(config, path, stop):
     identity = {"name": (socket.gethostname().strip() or "Poste Windows")[:100], "identity": config["token"]}
     while not stop.is_set():
         try:
-            result = api(config, "/v1/node/enroll", identity, credential="enrollment_key")
+            if public:
+                request = Request(config["server"].rstrip("/") + "/v1/node/contribute",
+                                  data=json.dumps(identity).encode(),
+                                  headers={"Content-Type": "application/json"}, method="POST")
+                with HTTP.open(request, timeout=15) as response:
+                    result = json.load(response)
+            else:
+                result = api(config, "/v1/node/enroll", identity, credential="enrollment_key")
             break
         except HTTPError as error:
             if 400 <= error.code < 500 and error.code not in (408, 429):
@@ -132,7 +148,10 @@ def enroll(config, path, stop):
         stop.wait(15)
     else:
         return
-    del config["enrollment_key"]
+    config.pop("enrollment_key", None)
+    config.pop("public_enrollment", None)
+    if result.get("pending"):
+        config["awaiting_approval"] = True
     save_json(path, config)
     logging.info("Nœud inscrit automatiquement (#%s).", result["id"])
 
@@ -158,7 +177,7 @@ def measure_network(config):
     return sample
 
 
-def run(config, compiled, device, hardware, stop, status, preferences):
+def run(config, compiled, device, hardware, stop, status, preferences, pipeline=None, config_path=None):
     pending = None
     network = {}
     capacity = {"capsule": CAPSULE, "device": device, "network": network, "agent_version": AGENT_VERSION}
@@ -166,6 +185,7 @@ def run(config, compiled, device, hardware, stop, status, preferences):
     sample_limit = None
     previous_limit = None
     idle_delay = 2
+    pipeline_turn = False
     if hardware:
         capacity["hardware"] = hardware
     while not stop.is_set() or pending is not None:
@@ -182,6 +202,16 @@ def run(config, compiled, device, hardware, stop, status, preferences):
                 pending = None
             if stop.is_set():
                 break
+            if pipeline is not None and pipeline.task is not None:
+                pipeline.poll(limit, status)
+                if pipeline.task is not None:
+                    preferences.changed.wait(5)
+                continue
+            if pipeline_turn and pipeline is not None and not reason:
+                pipeline_turn = False
+                if pipeline.poll(limit, status):
+                    idle_delay = 2
+                    continue
             if not reason and time.monotonic() >= probe_after:
                 try:
                     network["sample"] = measure_network(config | {"upload_limit_mbps": limit})
@@ -201,14 +231,23 @@ def run(config, compiled, device, hardware, stop, status, preferences):
             if limit != sample_limit:
                 network.pop("sample", None)
             task = api(config, "/v1/node/claim", capacity)["task"]
+            if config.pop("awaiting_approval", False):
+                try:
+                    save_json(config_path, config)
+                except OSError:
+                    logging.warning("L’état d’activation n’a pas pu être enregistré.")
             network.pop("sample", None)
             if task:
                 idle_delay = 2
+                pipeline_turn = True
                 status("Calcul en cours", "working")
                 if task["capsule"] != CAPSULE:
                     raise ValueError("Capsule inconnue.")
                 pending = {key: task[key] for key in ("job", "position", "lease")}
                 pending["values"] = calculate(compiled, task["values"])
+                continue
+            if not reason and pipeline is not None and pipeline.poll(limit, status):
+                idle_delay = 2
                 continue
             status(reason or "Disponible", "waiting" if reason else "ready")
             delay = idle_delay
@@ -219,7 +258,7 @@ def run(config, compiled, device, hardware, stop, status, preferences):
                 raise RuntimeError("Jeton du nœud refusé.") from error
             if error.code == 403:
                 pending = None
-                status("Désactivé par l’administration", "waiting")
+                status("En attente de validation" if config.get("awaiting_approval") else "Désactivé par l’administration", "waiting")
             else:
                 status("Serveur indisponible", "waiting")
             if error.code in (400, 409, 413, 415):
@@ -242,13 +281,20 @@ def run(config, compiled, device, hardware, stop, status, preferences):
 def run_agent(path, stop, status, preferences):
     try:
         config = load_config(path)
-        if config.get("enrollment_key"):
+        if config.get("enrollment_key") or config.get("public_enrollment") is True:
             status("Inscription au réseau", "waiting")
             enroll(config, path, stop)
         if not stop.is_set():
             status("Initialisation de la NPU", "waiting")
             compiled, device, hardware = probe_capsule()
-            run(config, compiled, device, hardware, stop, status, preferences)
+            public_key = path.with_name("capsule-signing.pub")
+            pipeline = CapsuleWorker(public_key, lambda route, data: api(config, route, data),
+                                     lambda route, body=None, **options: open_request(config, route, body, **options)) if public_key.is_file() else None
+            try:
+                run(config, compiled, device, hardware, stop, status, preferences, pipeline, path)
+            finally:
+                if pipeline is not None:
+                    pipeline.close()
     except Exception:
         logging.exception("Arrêt du calcul OPEN-NPU.")
         status("Erreur · consulter le journal", "error")
@@ -278,8 +324,10 @@ def main():
                     logging.info("Un agent utilise déjà cette configuration.")
                     return 0
                 preferences = Preferences(args.config)
+                updates = AgentUpdates(args.config, AGENT_VERSION, lambda: load_config(args.config),
+                                       lambda url: UPDATE_HTTP.open(url, timeout=15))
                 run_tray(log_file, preferences, lambda stop, status: run_agent(args.config, stop, status, preferences),
-                         version=AGENT_VERSION)
+                         version=AGENT_VERSION, updates=updates)
     except Exception:
         logging.exception("Arrêt de l'agent.")
         return 1
@@ -297,4 +345,5 @@ def probe_capsule():
 
 
 if __name__ == "__main__":
+    freeze_support()
     raise SystemExit(main())

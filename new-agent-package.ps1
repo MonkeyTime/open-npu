@@ -1,4 +1,5 @@
-param([Parameter(Mandatory = $true)][string]$Server, [string]$InvitationFile)
+﻿param([Parameter(Mandatory = $true)][string]$Server, [string]$InvitationFile, [string]$CapsulePublicKeyFile,
+      [string]$SignerThumbprint, [uri]$TimestampServer)
 $ErrorActionPreference = 'Stop'
 $origin = [Uri]$Server
 if (!$origin.IsAbsoluteUri -or !$origin.Host -or $origin.UserInfo -or $origin.Query -or $origin.Fragment -or
@@ -15,10 +16,20 @@ if ($InvitationFile) {
     throw "Fournissez le fichier JSON retourné par l’API de création d’invitation avec -InvitationFile."
 }
 if ([string]::IsNullOrWhiteSpace($key)) { throw "Clé d’inscription manquante." }
+if ((!$origin.IsLoopback -or $SignerThumbprint) -and (!$SignerThumbprint -or !$TimestampServer)) {
+    throw 'Un paquet distant exige un certificat Authenticode et un serveur pour horodater la signature.'
+}
 $package = Join-Path $PSScriptRoot ('dist/OpenNpuSetup-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Path $package
 Copy-Item -LiteralPath $source -Destination $package -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-agent.ps1') -Destination $package
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'verify-agent-package.ps1') -Destination $package
+if ($CapsulePublicKeyFile) {
+    Copy-Item -LiteralPath $CapsulePublicKeyFile -Destination (Join-Path $package 'capsule-signing.pub')
+}
 @{ server = $Server.TrimEnd('/'); enrollment_key = $key } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'enrollment.json') -Encoding UTF8
+if ($SignerThumbprint) {
+    & (Join-Path $PSScriptRoot 'sign-agent-package.ps1') -Package $package -SignerThumbprint $SignerThumbprint -TimestampServer $TimestampServer
+}
 Write-Output "Dossier d’installation à remettre aux participants : $package"

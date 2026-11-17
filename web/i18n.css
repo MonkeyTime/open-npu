@@ -1,0 +1,41 @@
+.site-header:has(.language-picker), .console-header:has(.language-picker) {
+  flex-wrap: wrap;
+}
+
+.language-picker {
+  display: inline-flex;
+  align-items: center;
+}
+
+.language-picker select {
+  max-inline-size: 100%;
+  border: 1px solid currentColor;
+  border-radius: .5rem;
+  padding: .45rem .65rem;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: .875rem;
+}
+
+.language-picker option {
+  color: #18302a;
+  background: #fff;
+}
+
+[dir="rtl"] :is(.console table, .api-table table, .console .fleet-summary button) {
+  text-align: start;
+}
+
+[dir="rtl"] .console-header nav {
+  margin-inline: min(3vw, 2rem) auto;
+}
+
+[dir="rtl"] :is(pre, code, .brand, input[type="url"], input[type="email"], input[type="number"]) {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+@media (max-width: 850px) {
+  [dir="rtl"] .console-header nav { margin-inline: 0; }
+}

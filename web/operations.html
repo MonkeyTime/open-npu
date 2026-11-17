@@ -2,28 +2,77 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Supervision · OPEN-NPU</title>
+  <title data-i18n="cab6c303a2df">Supervision · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
-  <link rel="stylesheet" href="/assets/control.css">
-  <script type="module" src="/assets/control.js"></script>
+  <link rel="stylesheet" href="/assets/operations.css">
+  <script type="module" src="/assets/operations.js"></script>
 </head>
-<body class="console">
+<body class="console telemetry">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations" aria-current="page">Supervision</a><a href="/admin/history">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" aria-current="page" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
-  <main id="admin" data-control="operations">
-    <div class="console-heading"><div><p class="section-label">Administration</p><h1>Supervision</h1></div><button type="button" id="refresh-control" class="secondary">Actualiser</button></div>
-    <p id="control-notice" role="status"></p>
-    <div class="control-grid">
-      <section class="panel"><h2>État de l’instance</h2><dl id="instance-metrics" class="work-metrics"></dl></section>
-      <section class="panel"><h2>File de calcul</h2><dl id="task-metrics" class="work-metrics"></dl><p><a class="project-directory-link" href="/admin/jobs">Ouvrir les calculs ↗</a></p></section>
-      <section class="panel"><h2>Versions des agents en ligne</h2><dl id="version-metrics" class="work-metrics"></dl></section>
+  <main id="admin" class="monitor">
+    <div class="monitor-heading">
+      <div><span class="role" id="operator-role" data-i18n="4b42c6690ebe">Administration</span><h1 data-i18n="b16490b96493">Centre de supervision</h1><p id="instance-mode" class="muted"></p></div>
+      <div class="monitor-controls">
+        <span id="live-state" class="live-state" data-state="waiting" role="status" data-i18n="280398acb030">Connexion…</span>
+        <button id="auto-toggle" type="button" class="secondary" aria-pressed="true" data-i18n="55ec3fcaad43">Actualisation auto</button>
+        <button id="refresh" type="button" class="secondary" data-i18n="d7d646faaecb">Actualiser</button>
+        <button id="fullscreen" type="button" class="secondary" hidden data-i18n="dee312b0129c">Plein écran</button>
+      </div>
+    </div>
+    <p id="monitor-error" role="status"></p>
+    <dl class="readouts">
+      <div><dt data-i18n="743a7c712efd">Nœuds connectés</dt><dd id="nodes-online">—</dd><small id="nodes-total"></small></div>
+      <div><dt data-i18n="2bd93dacb1f0">Nœuds en calcul</dt><dd id="nodes-working">—</dd><small id="nodes-ready"></small></div>
+      <div><dt data-i18n="a71b49632f3b">Lots en attente</dt><dd id="queued">—</dd><small id="oldest"></small></div>
+      <div><dt data-i18n="18aecf167ae7">Lots terminés</dt><dd id="completed-recent">—</dd><small id="completed-total"></small></div>
+    </dl>
+    <div class="monitor-grid">
+      <section class="monitor-panel chart" aria-labelledby="chart-label">
+        <div class="monitor-title"><div><h2 id="chart-label" data-i18n="fb8ce6cd8214">Débit de calcul</h2><p data-i18n="0a386ce76b07">Lots terminés par minute</p></div>
+          <label class="window-label" for="window">Fenêtre
+            <select id="window"><option value="10" data-i18n="8361323b37e4">10 min</option><option value="30" selected data-i18n="f69fa291de13">30 min</option></select>
+          </label>
+        </div>
+        <div class="chart-surface"><div class="chart-scale" id="chart-scale" aria-hidden="true"></div><div id="chart-bars" class="chart-bars" role="group" aria-label="Lots terminés par minute" data-i18n-aria-label="0a386ce76b07"></div></div>
+        <div class="chart-time"><span id="chart-start"></span><span id="chart-end"></span></div>
+        <p id="chart-note" class="chart-note"></p>
+      </section>
+      <section class="monitor-panel status-panel" aria-labelledby="queue-title">
+        <div class="monitor-title"><div><h2 id="queue-title" data-i18n="4fb7aad0dc3d">État des lots</h2><p data-i18n="dc50f8d071f8">Depuis le début du service</p></div><a href="/admin/jobs" data-i18n="81209e3d173e">Voir les demandes ↗</a></div>
+        <div id="queue-breakdown" class="queue-breakdown"></div>
+        <p id="expired" class="expiry"></p>
+      </section>
+      <section class="monitor-panel status-panel" aria-labelledby="pipeline-title">
+        <div class="monitor-title"><div><h2 id="pipeline-title" data-i18n="d39d34839db8">Calculs par étapes v2</h2></div><a href="/admin/capsules" data-i18n="f4588d447c3d">Ouvrir les capsules ↗</a></div>
+        <div id="pipeline-breakdown" class="queue-breakdown"></div>
+        <p id="pipeline-expired" class="expiry"></p>
+      </section>
+      <section class="monitor-panel map-panel" aria-labelledby="map-title">
+        <div class="monitor-title"><div><h2 id="map-title" data-i18n="838fbae19e20">Carte de la flotte</h2><p id="roster-count"></p></div><a href="/admin#flotte" data-i18n="88038d7187fa">Ouvrir la flotte ↗</a></div>
+        <div class="state-filters" id="state-filters" aria-label="Filtrer la carte" data-i18n-aria-label="33a666341183"></div>
+        <div id="node-map" class="node-map"></div>
+      </section>
+      <section class="monitor-panel active-panel" aria-labelledby="active-title">
+        <div class="monitor-title"><div><h2 id="active-title" data-i18n="20a8c5b7fa07">Calculs en cours</h2><p data-i18n="e0d1612d39d3">Attributions avec un bail valide</p></div><span class="counter" id="active-count">—</span></div>
+        <ol id="active-lots" class="feed"></ol>
+      </section>
+      <section class="monitor-panel" aria-labelledby="events-title">
+        <div class="monitor-title"><div><h2 id="events-title" data-i18n="3c0bbdd52036">Événements récents</h2></div><a href="/admin/history" data-i18n="a6f96928a138">Ouvrir le journal ↗</a></div>
+        <ol id="events-feed" class="feed"></ol>
+      </section>
+      <section class="monitor-panel" aria-labelledby="platform-title">
+        <div class="monitor-title"><div><h2 id="platform-title" data-i18n="18c91555e2d4">Instance et agents</h2></div></div>
+        <dl id="platform" class="platform"></dl>
+      </section>
     </div>
   </main>
-
 </body>
 </html>

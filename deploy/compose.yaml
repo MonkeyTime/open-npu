@@ -7,6 +7,8 @@ services:
     environment:
       OPEN_NPU_MODE: pilot
       OPEN_NPU_BIND: 0.0.0.0
+      OPEN_NPU_PRIVATE_PROXY: "1"
+      OPEN_NPU_PUBLIC_ENROLLMENT: ${OPEN_NPU_PUBLIC_ENROLLMENT:-0}
       OPEN_NPU_RUNTIME: /state
       OPEN_NPU_ADMIN_SECRET_FILE: /run/secrets/admin
       OPEN_NPU_TRUSTED_HOSTS: ${OPEN_NPU_DOMAIN:?Set the pilot domain}
@@ -14,6 +16,8 @@ services:
       - admin
     volumes:
       - state:/state
+    networks:
+      - backend
     read_only: true
     tmpfs:
       - /tmp
@@ -35,6 +39,9 @@ services:
     depends_on:
       open-npu:
         condition: service_healthy
+    networks:
+      - default
+      - backend
     ports:
       - "80:80"
       - "443:443"
@@ -42,6 +49,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+networks:
+  backend:
+    internal: true
 secrets:
   admin:
     file: ${OPEN_NPU_ADMIN_SECRET_PATH:?Set the path to a private secret file}

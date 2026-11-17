@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Calculs · OPEN-NPU</title>
+  <title data-i18n="28114eda857e">Calculs · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <link rel="stylesheet" href="/assets/control.css">
@@ -12,25 +13,26 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs" aria-current="page">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" aria-current="page" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="admin" data-control="jobs">
-    <div class="console-heading"><div><p class="section-label">Administration</p><h1>Calculs</h1></div><button type="button" id="refresh-control" class="secondary">Actualiser</button></div>
+    <div class="console-heading"><div><p class="section-label" data-i18n="4b42c6690ebe">Administration</p><h1 data-i18n="eb40fb4feed8">Calculs</h1></div><button type="button" id="refresh-control" class="secondary" data-i18n="d7d646faaecb">Actualiser</button></div>
     <p id="control-notice" role="status"></p>
     <section class="panel">
       <form id="jobs-filters" class="control-form">
-        <label>Projet ou identifiant de demande <input type="search" name="q" maxlength="100"></label>
-        <label>État <select name="status"><option value="">Tous</option><option value="queued">En attente</option><option value="running">En cours</option><option value="done">Terminés</option><option value="failed">En échec</option><option value="cancelled">Annulés</option></select></label>
+        <label data-i18n="26f49d8f242d">Projet ou identifiant de demande <input type="search" name="q" maxlength="100"></label>
+        <label>État <select name="status"><option value="" data-i18n="2ff599814388">Tous</option><option value="queued" data-i18n="2f6c8477e92b">En attente</option><option value="running" data-i18n="797f5dcd0217">En cours</option><option value="done" data-i18n="ece3085be29e">Terminés</option><option value="failed" data-i18n="fb6647356bd3">En échec</option><option value="cancelled" data-i18n="c0a7d3756b97">Annulés</option></select></label>
         <label>Par page <select name="size"><option>25</option><option>50</option><option>100</option></select></label>
-        <button>Filtrer</button>
+        <button data-i18n="ec16710e0e6c">Filtrer</button>
       </form>
-      <div class="table-scroll" tabindex="0" aria-label="Calculs">
-        <table><thead><tr><th>Demande</th><th>Projet</th><th>Soumise le</th><th>État</th><th>Progression</th><th>Action</th></tr></thead><tbody id="job-rows"></tbody></table>
+      <div class="table-scroll" tabindex="0" aria-label="Calculs" data-i18n-aria-label="eb40fb4feed8">
+        <table><thead><tr><th data-i18n="e79fa141dd58">Demande</th><th data-i18n="9c466199f8ec">Projet</th><th data-i18n="17dd3dcf4e55">Soumise le</th><th data-i18n="de4dd03297a1">État</th><th data-i18n="f193d07c3776">Progression</th><th data-i18n="64cff1319d2f">Action</th></tr></thead><tbody id="job-rows"></tbody></table>
       </div>
-      <div class="pagination"><span id="job-page"></span><button id="job-prev" class="secondary" type="button" disabled>Précédente</button><button id="job-next" class="secondary" type="button" disabled>Suivante</button></div>
+      <div class="pagination"><span id="job-page"></span><button id="job-prev" class="secondary" type="button" disabled data-i18n="9aff6c5679b2">Précédente</button><button id="job-next" class="secondary" type="button" disabled data-i18n="faf9a798db90">Suivante</button></div>
     </section>
   </main>
-  <dialog id="action-dialog"><h2 id="action-title">Confirmer l’action</h2><p id="action-text"></p><form method="dialog" class="dialog-actions"><button value="cancel" class="secondary">Annuler</button><button value="confirm">Confirmer</button></form></dialog>
+  <dialog id="action-dialog"><h2 id="action-title" data-i18n="d5df954e0ef1">Confirmer l’action</h2><p id="action-text"></p><form method="dialog" class="dialog-actions"><button value="cancel" class="secondary" data-i18n="46ad3916f6a0">Annuler</button><button value="confirm" data-i18n="30a8b7846961">Confirmer</button></form></dialog>
 </body>
 </html>

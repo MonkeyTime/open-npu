@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Fiche projet · OPEN-NPU</title>
+  <title data-i18n="46165b89d890">Fiche projet · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <link rel="stylesheet" href="/assets/projects.css">
@@ -12,77 +13,83 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="admin" data-page="detail">
-    <a class="console-link back-link" href="/admin/projects">← Tous les projets</a>
+    <a class="console-link back-link" href="/admin/projects" data-i18n="e13258531ad2">← Tous les projets</a>
     <div class="console-heading project-heading">
-      <div><p class="section-label" id="project-id">Fiche projet</p><h1 id="project-name">Projet scientifique</h1></div>
-      <div class="toolbar"><span id="detail-status" class="node-status" hidden></span><a id="project-history" class="console-link" href="/admin/history" hidden>Historique du projet ↗</a><button id="reload-project" type="button" class="secondary">Actualiser</button></div>
+      <div><p class="section-label" id="project-id" data-i18n="fceb22184add">Fiche projet</p><h1 id="project-name" data-i18n="cb9b181091cf">Projet scientifique</h1></div>
+      <div class="toolbar"><span id="detail-status" class="node-status" hidden></span><a id="project-history" class="console-link" href="/admin/history" hidden data-i18n="56a57ad00758">Historique du projet ↗</a><button id="reload-project" type="button" class="secondary" data-i18n="d7d646faaecb">Actualiser</button></div>
     </div>
     <p id="detail-notice" role="status"></p>
     <div class="project-grid" id="project-content" hidden>
       <section class="panel">
-        <h2>Informations du projet</h2>
+        <h2 data-i18n="5c7e9464d69b">Informations du projet</h2>
         <form id="metadata-form">
-          <label for="name">Nom</label><input name="name" id="name" maxlength="100" required>
-          <label for="affiliation">Établissement ou laboratoire</label><input name="affiliation" id="affiliation" maxlength="150">
-          <label for="contact">Adresse de contact</label><input name="contact" id="contact" type="email" maxlength="254">
-          <label for="description">Description</label><textarea name="description" id="description" rows="5" maxlength="3000" required></textarea>
-          <button>Enregistrer les informations</button>
+          <label for="name" data-i18n="b2c124536d21">Nom</label><input name="name" id="name" maxlength="100" required>
+          <label for="affiliation" data-i18n="db9da8f41d14">Établissement ou laboratoire</label><input name="affiliation" id="affiliation" maxlength="150">
+          <label for="contact" data-i18n="c447812a5ef9">Adresse de contact</label><input name="contact" id="contact" type="email" maxlength="254">
+          <label for="description" data-i18n="526e0087cc3f">Description</label><textarea name="description" id="description" rows="5" maxlength="3000" required></textarea>
+          <button data-i18n="8a4cf1e5e96f">Enregistrer les informations</button>
         </form>
       </section>
       <div class="operations-aside">
-        <section class="panel"><h2>Instruction et accès API</h2><p id="access-state" class="muted"></p><div id="access-actions" class="toolbar"></div><p><a id="scoped-keys" class="console-link" href="/admin/access" hidden>Gérer les clés nommées ↗</a></p></section>
+        <section class="panel"><h2 data-i18n="1bf3347e541a">Instruction et accès API</h2><p id="access-state" class="muted"></p><div id="access-actions" class="toolbar"></div><p><a id="scoped-keys" class="console-link" href="/admin/access" hidden data-i18n="79de2e96c11e">Gérer les clés nommées ↗</a></p></section>
         <section class="panel" id="project-policy" hidden>
-          <h2>Admission et priorité</h2>
+          <h2 data-i18n="182e391948a1">Admission et priorité</h2>
           <form id="policy-form">
-            <label><input name="admissions" type="checkbox"> Accepter les nouvelles demandes</label>
-            <label>Demandes actives maximum <input name="max_active" type="number" min="1" max="1000" required></label>
-            <label>Nouvelles demandes par minute <input name="per_minute" type="number" min="1" max="1000" required></label>
-            <label>Priorité <select name="priority"><option value="0">Normale</option><option value="1">Élevée</option><option value="2">Très élevée</option><option value="3">Urgente</option></select></label>
-            <p class="muted">Suspendre l’admission laisse les demandes déjà soumises se terminer.</p>
-            <button>Enregistrer les règles</button>
+            <label data-i18n="92030cbc3f41"><input name="admissions" type="checkbox"> Accepter les nouvelles demandes</label>
+            <label data-i18n="af9203aba87b">Demandes actives maximum <input name="max_active" type="number" min="1" max="1000" required></label>
+            <label data-i18n="467691bbcb97">Nouvelles demandes par minute <input name="per_minute" type="number" min="1" max="1000" required></label>
+            <label>Priorité <select name="priority"><option value="0" data-i18n="1aaf3e0e4a95">Normale</option><option value="1" data-i18n="097c37b2dd7a">Élevée</option><option value="2" data-i18n="e0328b10e27f">Très élevée</option><option value="3" data-i18n="9dc81c64f153">Urgente</option></select></label>
+            <p class="muted" data-i18n="91a6ee0219b1">Suspendre l’admission laisse les demandes déjà soumises se terminer.</p>
+            <button data-i18n="bd5f92d83c79">Enregistrer les règles</button>
           </form>
         </section>
         <section class="panel" id="reservation">
-          <h2>Réservation de nœuds</h2>
+          <h2 data-i18n="b9576b6c0898">Réservation de nœuds</h2>
           <p id="reservation-state" class="muted"></p>
           <div id="reservation-controls" hidden>
             <form id="reservation-form">
-              <label for="reservation-count">Nombre de nœuds</label>
+              <label for="reservation-count" data-i18n="1c5078bb6691">Nombre de nœuds</label>
               <div class="reservation-actions">
                 <input id="reservation-count" type="number" min="1" max="100" step="1" required>
-                <button>Réserver automatiquement</button>
-                <button type="button" id="reserve-manual" class="secondary">Réserver la sélection</button>
-                <button type="button" id="release-reservation" class="quiet" hidden>Libérer</button>
+                <button data-i18n="e42e1fd79eda">Réserver automatiquement</button>
+                <button type="button" id="reserve-manual" class="secondary" data-i18n="2d452d0e79be">Réserver la sélection</button>
+                <button type="button" id="release-reservation" class="quiet" hidden data-i18n="7f75debb0880">Libérer</button>
               </div>
             </form>
             <p id="transfer-state" class="muted"></p>
-            <details id="reserved-details" hidden><summary>Nœuds réservés</summary><ul id="reserved-nodes"></ul></details>
+            <details id="reserved-details" hidden><summary data-i18n="079784140f8f">Nœuds réservés</summary><ul id="reserved-nodes"></ul></details>
           </div>
         </section>
       </div>
       <section class="panel project-jobs">
-        <h2>Demandes de calcul récentes</h2>
+        <h2 data-i18n="a56956caeafc">Calculs du projet</h2>
+        <h3 data-i18n="f82062e82982">Demandes par étapes v2</h3>
+        <dl class="work-metrics project-metrics" id="project-pipeline"></dl>
+        <p><a href="/admin/capsules" data-i18n="d2597601caaf">Ouvrir les demandes v2 ↗</a></p>
+        <h3 data-i18n="d98691691c17">Lots v1</h3>
         <dl class="work-metrics project-metrics" id="project-metrics"></dl>
-        <div class="table-scroll" role="region" aria-label="Demandes de calcul" tabindex="0">
-          <table><thead><tr><th scope="col">Demande</th><th scope="col">Soumise le</th><th scope="col">État</th><th scope="col">Lots terminés</th></tr></thead><tbody id="project-jobs"></tbody></table>
+        <div class="table-scroll" role="region" aria-label="Demandes de calcul" tabindex="0" data-i18n-aria-label="435aa0d41977">
+          <table><thead><tr><th scope="col" data-i18n="e79fa141dd58">Demande</th><th scope="col" data-i18n="17dd3dcf4e55">Soumise le</th><th scope="col" data-i18n="de4dd03297a1">État</th><th scope="col" data-i18n="18aecf167ae7">Lots terminés</th></tr></thead><tbody id="project-jobs"></tbody></table>
         </div>
       </section>
     </div>
   </main>
   <dialog id="project-confirm" aria-labelledby="confirm-heading">
     <h2 id="confirm-heading"></h2><p id="confirm-description"></p>
-    <form method="dialog" class="dialog-actions"><button value="cancel" class="secondary">Annuler</button><button value="confirm" id="confirm-run"></button></form>
+    <form method="dialog" class="dialog-actions"><button value="cancel" class="secondary" data-i18n="46ad3916f6a0">Annuler</button><button value="confirm" id="confirm-run"></button></form>
   </dialog>
   <dialog id="project-secret" aria-labelledby="key-heading">
-    <h2 id="key-heading">Clé API du projet</h2>
-    <label for="project-key">Clé API à transmettre au porteur du projet</label>
+    <h2 id="key-heading" data-i18n="f9c2e8ded67f">Clé API du projet</h2>
+    <label for="project-key" data-i18n="30467aed50eb">Clé API à transmettre au porteur du projet</label>
     <textarea id="project-key" rows="2" readonly></textarea>
-    <p>Copiez-la maintenant. Elle s’affiche une seule fois.</p>
-    <form method="dialog" class="dialog-actions"><button>Fermer</button></form>
+    <p data-i18n="7447097b9d03">Copiez-la maintenant. Elle s’affiche une seule fois.</p>
+    <p><a class="console-link" href="/docs/api" target="_blank" rel="noopener" data-i18n="a34027e4ab10">Documentation API à transmettre au porteur du projet ↗</a></p>
+    <form method="dialog" class="dialog-actions"><button data-i18n="711e5f2e198d">Fermer</button></form>
   </dialog>
 </body>
 </html>

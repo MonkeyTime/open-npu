@@ -3,90 +3,150 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="OPEN-NPU explore le calcul scientifique distribué sur les unités de traitement neuronal des campus et des volontaires.">
-  <title>OPEN-NPU — Calcul distribué pour la recherche</title>
+  <meta name="description" content="OPEN-NPU explore le calcul scientifique distribué sur les unités de traitement neuronal des campus et des volontaires." data-i18n-content="ee190bd8610c">
+  <title data-i18n="822361aaaf2d">OPEN-NPU — Calcul distribué pour la recherche</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/landing.css">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <script type="module" src="/assets/portal.js"></script>
 </head>
 <body class="public" id="top">
-  <a class="skip" href="#contenu">Aller au contenu</a>
+  <a class="skip" href="#contenu" data-i18n="4d1606f6a962">Aller au contenu</a>
   <header class="site-header">
     <a class="brand" href="#top"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Navigation principale">
-      <a href="#fonctionnement">Fonctionnement</a>
-      <a href="#pilote">Périmètre du pilote</a>
-      <a class="cta small" href="#proposer">Proposer un projet <span aria-hidden="true">↗</span></a>
+    <nav aria-label="Navigation principale" data-i18n-aria-label="4ea15f9a0d37">
+      <a href="#fonctionnement" data-i18n="bbfa09a5ee3e">Fonctionnement</a>
+      <a href="#pilote" data-i18n="ce72026cf692">Périmètre du pilote</a>
+      <a class="api-nav" href="/docs/api" data-i18n="7385434663b2">Documentation API</a>
+      <a class="agent-nav" href="#agent" data-i18n="landing.volunteer">Contribuez</a>
+      <a class="cta small" href="#proposer" data-i18n="landing.compute">Proposer un calcul</a>
     </nav>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="contenu" class="public-main">
     <section class="hero wrap" aria-labelledby="title">
       <div>
-        <p class="eyebrow">Infrastructure ouverte pour la recherche</p>
-        <h1 id="title">Le calcul distribué à l’échelle des campus.</h1>
-        <p class="lead">OPEN-NPU explore la mise en commun des unités de traitement neuronal (NPU) d’ordinateurs volontaires pour exécuter des tâches scientifiques par lots.</p>
-        <a class="cta" href="#proposer">Proposer un projet <span aria-hidden="true">↗</span></a>
+        <p class="eyebrow" data-i18n="8a0a7d6f8c8f">Infrastructure ouverte pour la recherche</p>
+        <h1 id="title" data-i18n="85d9abb77fd3">Le calcul distribué à l’échelle des campus.</h1>
+        <p class="lead" data-i18n="5a6bc34923e4">OPEN-NPU explore la mise en commun des unités de traitement neuronal (NPU) d’ordinateurs volontaires pour exécuter des tâches scientifiques par lots.</p>
+        <div class="hero-actions">
+          <a class="cta" href="#proposer" data-i18n="landing.compute">Proposer un calcul</a>
+          <a class="cta cta-outline" href="#agent" data-i18n="landing.volunteer">Contribuez</a>
+          <a class="cta cta-outline" href="#contribuer" data-i18n="landing.contribute">Mettre des NPU à disposition</a>
+        </div>
       </div>
       <figure class="network">
         <div class="network-stage">
-          <div class="network-item origin">Projet de recherche</div>
+          <div class="network-item origin" data-i18n="c2a77b04199a">Projet de recherche</div>
           <div class="stem"></div>
-          <div class="network-item hub">File de calcul <span>API OPEN-NPU</span></div>
+          <div class="network-item hub" data-i18n="2195bd98e58a">File de calcul <span>API OPEN-NPU</span></div>
           <div class="branches" aria-hidden="true"><b></b><b></b><b></b></div>
           <div class="node-row">
-            <div class="network-item">NPU <span>Lot A</span></div>
-            <div class="network-item">NPU <span>Lot B</span></div>
-            <div class="network-item">NPU <span>Lot C</span></div>
+            <div class="network-item">NPU <span data-i18n="bd5b13d5707a">Lot A</span></div>
+            <div class="network-item">NPU <span data-i18n="661bde47fb11">Lot B</span></div>
+            <div class="network-item">NPU <span data-i18n="198e6fda3d39">Lot C</span></div>
           </div>
         </div>
-        <figcaption>Schéma de principe du traitement par lots.</figcaption>
+        <figcaption data-i18n="5503adf4931c">Schéma de principe du traitement par lots.</figcaption>
       </figure>
     </section>
     <section class="section wrap" id="fonctionnement" aria-labelledby="how">
-      <h2 id="how">Du projet aux résultats</h2>
+      <h2 id="how" data-i18n="c2498352fb1f">Du projet aux résultats</h2>
       <ol class="process">
-        <li><h3>Soumettre un cas d’usage</h3><p>L’équipe décrit l’objectif scientifique, le type de données et les calculs envisagés. Après examen, un projet approuvé reçoit une clé API.</p></li>
-        <li><h3>Distribuer les lots</h3><p>Les agents Windows prennent les lots compatibles avec leur NPU. Chaque agent exécute un graphe de calcul prédéfini. Si un nœud décroche, son lot peut être repris.</p></li>
-        <li><h3>Récupérer les résultats</h3><p>L’API indique l’avancement et rassemble les résultats dans l’ordre de la demande. Plusieurs machines peuvent traiter des lots indépendants en parallèle.</p></li>
+        <li><h3 data-i18n="384f979491c4">Soumettre un cas d’usage</h3><p data-i18n="b99fdacc7af0">L’équipe décrit l’objectif scientifique, le type de données et les calculs envisagés. Après examen, un projet approuvé reçoit une clé API.</p></li>
+        <li><h3 data-i18n="e033763bf799">Distribuer les lots</h3><p data-i18n="b562c8dde282">Les agents Windows prennent les lots compatibles avec leur NPU. Chaque agent exécute un graphe de calcul prédéfini. Si un nœud décroche, son lot peut être repris.</p></li>
+        <li><h3 data-i18n="b1452b5bd55c">Récupérer les résultats</h3><p data-i18n="fdfb5a70c564">L’API indique l’avancement et rassemble les résultats dans l’ordre de la demande. Plusieurs machines peuvent traiter des lots indépendants en parallèle.</p></li>
       </ol>
+      <a class="demo-link" href="/docs/api#exemple" data-i18n="landing.demo">Reproduire le calcul de démonstration</a>
+    </section>
+    <section class="section wrap" id="llm" aria-labelledby="llm-title">
+      <h2 id="llm-title" data-i18n="landing.llm-title">Découper un LLM entre plusieurs NPU</h2>
+      <p class="lead" data-i18n="landing.llm-intro">Les tâches indépendantes s’exécutent par lots en parallèle. Pour répartir l’inférence d’un même modèle de langage, OPEN-NPU enchaîne des étapes sur des nœuds compatibles.</p>
+      <ol class="process">
+        <li><h3 data-i18n="landing.llm-export-title">Exporter le modèle par étapes</h3><p data-i18n="landing.llm-export">L’équipe découpe et exporte le modèle en graphes OpenVINO. Chaque étape doit tenir dans les ressources du poste qui l’exécute.</p></li>
+        <li><h3 data-i18n="landing.llm-sign-title">Publier une capsule signée</h3><p data-i18n="landing.llm-sign">La capsule versionnée décrit les étapes et leurs entrées et sorties. Après approbation, les agents vérifient sa signature et l’intégrité des fichiers.</p></li>
+        <li><h3 data-i18n="landing.llm-run-title">Enchaîner les étapes</h3><p data-i18n="landing.llm-run">Le serveur affecte chaque étape à un nœud compatible et transmet sa sortie à l’étape suivante. Si un bail expire, l’étape peut être réattribuée.</p></li>
+      </ol>
+      <p class="llm-validation" data-i18n="landing.llm-validation">Le prototype a été testé avec un décodeur miniature sur Intel AI Boost. Chaque LLM préentraîné demande un découpage adapté et une validation sur le matériel cible.</p>
+      <a class="demo-link" href="/docs/api#capsules" data-i18n="8a30f9358cb8">Capsules signées et calculs par étapes</a>
     </section>
     <section class="pilot" id="pilote" aria-labelledby="scope">
       <div class="wrap pilot-inner">
         <div>
-          <p class="eyebrow">Périmètre du pilote</p>
-          <h2 id="scope">Une expérimentation ouverte aux équipes de recherche.</h2>
+          <p class="eyebrow" data-i18n="ce72026cf692">Périmètre du pilote</p>
+          <h2 id="scope" data-i18n="630b2be795b3">Une expérimentation ouverte aux équipes de recherche.</h2>
         </div>
         <div>
-          <p>Le prototype local valide l’exécution d’un calcul de démonstration sur Intel AI Boost, de la soumission à la restitution des résultats.</p>
-          <p>Pour un premier cas d’usage, nous cherchons des tâches répétables, faciles à répartir et dont les résultats peuvent être comparés à une référence. L’inférence sur des lots d’images de microscopie est un exemple à étudier.</p>
-          <p>Les équipes peuvent proposer une charge de calcul. Les services numériques et les équipes chargées du calcul scientifique peuvent signaler des postes compatibles pour un futur pilote interétablissements.</p>
+          <p data-i18n="814653ba5503">Le prototype local valide l’exécution d’un calcul de démonstration sur Intel AI Boost, de la soumission à la restitution des résultats.</p>
+          <p data-i18n="3b592f400963">Pour un premier cas d’usage, nous cherchons des tâches répétables, faciles à répartir et dont les résultats peuvent être comparés à une référence. L’inférence sur des lots d’images de microscopie est un exemple à étudier.</p>
+          <p data-i18n="e45ba4a70de0">Les équipes peuvent proposer une charge de calcul. Les services numériques et les équipes chargées du calcul scientifique peuvent signaler des postes compatibles pour un futur pilote interétablissements.</p>
         </div>
       </div>
     </section>
     <section class="section wrap proposal" id="proposer" aria-labelledby="submit">
       <div>
-        <h2 id="submit">Proposer un projet</h2>
-        <p>Décrivez le cas d’usage, le volume estimé et la façon dont vous valideriez les résultats. Pour une contribution matérielle, indiquez le nombre de postes et les modèles de NPU.</p>
-        <p>Ce formulaire recueille une description du projet. Évitez d’y inclure des données de recherche confidentielles.</p>
+        <h2 id="submit" data-i18n="landing.compute">Proposer un calcul</h2>
+        <p data-i18n="landing.workload">Décrivez le besoin scientifique, le volume estimé et la méthode de validation des résultats.</p>
+        <p data-i18n="5acae8c5d781">Ce formulaire recueille une description du projet. Évitez d’y inclure des données de recherche confidentielles.</p>
       </div>
       <form id="project-form">
-        <label for="project-name">Nom du projet</label>
-        <input id="project-name" name="name" maxlength="100" required>
-        <label for="affiliation">Établissement ou laboratoire</label>
-        <input id="affiliation" name="affiliation" maxlength="150" autocomplete="organization" required>
-        <label for="contact">Adresse de contact</label>
+        <label for="project-name" data-i18n="5598c6792188">Nom du projet</label>
+        <input id="project-name" name="name" dir="auto" maxlength="100" required>
+        <label for="affiliation" data-i18n="db9da8f41d14">Établissement ou laboratoire</label>
+        <input id="affiliation" name="affiliation" dir="auto" maxlength="150" autocomplete="organization" required>
+        <label for="contact" data-i18n="c447812a5ef9">Adresse de contact</label>
         <input id="contact" name="contact" type="email" maxlength="254" autocomplete="email" required>
-        <label for="description">Description de la proposition</label>
-        <textarea id="description" name="description" rows="5" maxlength="3000" required></textarea>
-        <button class="cta">Envoyer la proposition <span aria-hidden="true">↗</span></button>
+        <label for="description" data-i18n="57d02a2b41e5">Description de la proposition</label>
+        <textarea id="description" name="description" dir="auto" rows="5" maxlength="3000" required></textarea>
+        <button class="cta" data-i18n="f0dbe3902aac">Envoyer la proposition <span aria-hidden="true">↗</span></button>
         <p id="submission-status" role="status"></p>
       </form>
+    </section>
+    <section class="section wrap proposal contribution" id="contribuer" aria-labelledby="contribution-title">
+      <div>
+        <h2 id="contribution-title" data-i18n="landing.contribute">Mettre des NPU à disposition</h2>
+        <p data-i18n="landing.contribution-info">Indiquez les postes que votre établissement pourrait mettre à disposition. L’équipe du pilote vous contactera pour vérifier leur compatibilité et organiser un essai.</p>
+      </div>
+      <form id="contribution-form">
+        <label for="contribution-affiliation" data-i18n="db9da8f41d14">Établissement ou laboratoire</label>
+        <input id="contribution-affiliation" name="affiliation" dir="auto" maxlength="150" autocomplete="organization" required>
+        <label for="contribution-contact" data-i18n="landing.technical-contact">Adresse e-mail du contact technique</label>
+        <input id="contribution-contact" name="contact" type="email" maxlength="254" autocomplete="email" required>
+        <label for="contribution-count" data-i18n="landing.node-count">Nombre de postes</label>
+        <input id="contribution-count" name="node_count" type="number" min="1" max="100000" step="1" required>
+        <label for="contribution-models" data-i18n="landing.models">Modèles de NPU</label>
+        <textarea id="contribution-models" name="models" dir="auto" rows="3" maxlength="500" required></textarea>
+        <button class="cta" data-i18n="landing.send-contribution">Envoyer l’offre de contribution</button>
+        <p id="contribution-status" role="status"></p>
+      </form>
+    </section>
+    <section class="section wrap proposal" id="agent" aria-labelledby="agent-title">
+      <div>
+        <h2 id="agent-title" data-i18n="landing.agent-title">Agent Windows</h2>
+        <p id="agent-invite-info" data-i18n="landing.agent-description">Téléchargez l’agent Windows x64. Pour inscrire un nouveau poste, demandez une invitation à l’équipe du pilote.</p>
+        <p id="agent-public-info" data-i18n="landing.agent-public" hidden>Installez l’agent Windows x64 sans invitation. Après l’installation, le poste apparaît dans la flotte et peut commencer à contribuer après validation.</p>
+        <p id="agent-download-status" role="status"></p>
+        <p id="agent-download-options" hidden>
+          <a class="cta" id="agent-setup-link" data-i18n="landing.agent-setup" hidden>Télécharger l’installateur (.exe)</a>
+          <a class="cta" id="agent-download-link"></a>
+        </p>
+        <p id="agent-download-hash" hidden><code dir="ltr"></code></p>
+      </div>
+      <div>
+        <h3 data-i18n="landing.agent-update">Mettre à jour un agent installé</h3>
+        <p data-i18n="landing.agent-auto">Dès la version 0.3.5, l’agent installé vérifie les mises à jour toutes les 24 heures. Il télécharge la nouvelle version et vous prévient dans Windows quand elle est prête à installer.</p>
+        <p data-i18n="landing.agent-update-info">Extrayez l’archive. Pour un paquet signé, vérifiez d’abord le paquet avec un vérificateur obtenu séparément et l’empreinte de l’éditeur. Une mise à jour conserve l’inscription et les préférences.</p>
+        <pre><code>.\install-agent.ps1 -Update</code></pre>
+        <p data-i18n="landing.agent-trust">Pour la première mise à jour signée, indiquez aussi l’empreinte SHA-256 de l’éditeur avec le paramètre ci-dessous.</p>
+        <pre><code>.\install-agent.ps1 -Update -PublisherSha256 &lt;fingerprint&gt;</code></pre>
+      </div>
     </section>
   </main>
   <footer class="site-footer">
     <div class="wrap"><a class="brand" href="#top"><i aria-hidden="true"></i>OPEN-NPU</a>
-      <p>Open Participatory Edge Network for Neural Processing Units</p>
-      <a href="/admin">Administration <span aria-hidden="true">↗</span></a></div>
+      <p lang="en" dir="ltr">Open Participatory Edge Network for Neural Processing Units</p>
+      <a href="/docs/api" data-i18n="7385434663b2">Documentation API</a>
+      <a href="/admin" data-i18n="f426097fec07">Administration <span aria-hidden="true">↗</span></a></div>
   </footer>
 </body>
 </html>

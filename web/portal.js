@@ -1,3 +1,4 @@
+import { t, translateError, language } from "./i18n.js";
 const selectionKey = "open-npu-project-selection";
 
 export function transferSelection(ids) {
@@ -26,7 +27,7 @@ export async function api(path, data) {
   };
   const response = await fetch(path, {...options, signal: AbortSignal.timeout(15000)});
   const result = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : {};
-  if (!response.ok) throw new Error(result.error || "La requête a échoué.");
+  if (!response.ok) throw new Error(translateError(result.error, response.status));
   return result;
 }
 
@@ -61,6 +62,39 @@ if (projectForm) {
   const status = document.querySelector("#submission-status");
   handleForm(projectForm, status, async (data) => {
     const project = await api("/v1/projects", data);
-    status.textContent = `Projet n°${project.id} envoyé. Il est en attente de validation.`;
+    status.textContent = t("Projet n°{0} envoyé. Il est en attente de validation.", project.id);
+  });
+}
+
+const contributionForm = document.querySelector("#contribution-form");
+if (contributionForm) {
+  const status = document.querySelector("#contribution-status");
+  handleForm(contributionForm, status, async (data) => {
+    const contribution = await api("/v1/contributions", {...data, node_count: Number(data.node_count)});
+    status.textContent = t("Offre de contribution n°{0} reçue.", contribution.id);
+  });
+}
+
+const releaseNotice = document.querySelector("#agent-download-status");
+if (releaseNotice) {
+  api("/downloads/agent/latest.json").then((release) => {
+    const link = document.querySelector("#agent-download-link");
+    const setup = document.querySelector("#agent-setup-link");
+    const hash = document.querySelector("#agent-download-hash");
+    const size = new Intl.NumberFormat(language, {maximumFractionDigits: 1}).format(release.size / 1048576);
+    link.href = release.url;
+    link.textContent = t("Télécharger la version {0}", release.version);
+    if (release.setup_url) {
+      setup.href = release.setup_url;
+      setup.hidden = false;
+      document.querySelector("#agent-invite-info").hidden = true;
+      document.querySelector("#agent-public-info").hidden = false;
+      link.classList.add("cta-outline");
+    }
+    hash.querySelector("code").textContent = "ZIP SHA-256 " + release.sha256;
+    releaseNotice.textContent = t(release.signed ? "Paquet signé · {0} Mio" : "Essai local · paquet non signé · {0} Mio", size);
+    document.querySelector("#agent-download-options").hidden = hash.hidden = false;
+  }).catch(() => {
+    releaseNotice.textContent = t("Aucun téléchargement disponible sur cette instance.");
   });
 }

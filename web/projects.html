@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Projets scientifiques · OPEN-NPU</title>
+  <title data-i18n="5e9991ac78fa">Projets scientifiques · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <link rel="stylesheet" href="/assets/projects.css">
@@ -12,37 +13,60 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects" aria-current="page">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" aria-current="page" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="admin" data-page="list">
     <div class="console-heading">
-      <div><p class="section-label">Administration</p><h1>Projets scientifiques</h1></div>
-      <a class="console-link" href="/admin#flotte">Voir la flotte ↗</a>
+      <div><p class="section-label" data-i18n="4b42c6690ebe">Administration</p><h1 data-i18n="c9bb3767fa77">Projets scientifiques</h1></div>
+      <a class="console-link" href="/admin#flotte" data-i18n="7d95979aa415">Voir la flotte ↗</a>
     </div>
     <p id="selection-bridge" class="transfer" role="status"></p>
-    <div id="project-summary" class="fleet-summary projects-summary" aria-label="Filtrer les projets par statut"></div>
+    <div id="project-summary" class="fleet-summary projects-summary" aria-label="Filtrer les projets par statut" data-i18n-aria-label="5f829d761333"></div>
     <section class="panel" aria-labelledby="project-list-title">
-      <div class="fleet-title"><h2 id="project-list-title">Liste des projets</h2><span id="project-total" class="muted"></span></div>
+      <div class="fleet-title"><h2 id="project-list-title" data-i18n="37dd6c10b2b5">Liste des projets</h2><span id="project-total" class="muted"></span></div>
       <form id="project-filters" class="filters">
-        <div><label for="project-search">Rechercher</label><input id="project-search" type="search" maxlength="160" placeholder="Projet, identifiant, établissement ou contact"></div>
-        <div><label for="project-status">Statut</label><select id="project-status"><option value="">Tous</option><option value="pending">En attente</option><option value="approved">Approuvé</option><option value="rejected">Refusé</option></select></div>
-        <div><label for="project-reservation">Nœuds réservés</label><select id="project-reservation"><option value="">Tous</option><option value="reserved">Avec réservation</option><option value="shared">Sans réservation</option></select></div>
-        <div><label for="project-sort">Tri</label><select id="project-sort"><option value="recent">Plus récents</option><option value="name">Nom (A–Z)</option></select></div>
-        <div><label for="project-size">Par page</label><select id="project-size"><option>25</option><option>50</option><option>100</option></select></div>
-        <button class="secondary" type="reset">Réinitialiser</button>
+        <div><label for="project-search" data-i18n="733d1c742675">Rechercher</label><input id="project-search" type="search" maxlength="160" placeholder="Projet, identifiant, établissement ou contact" data-i18n-placeholder="7c7fb78fa306"></div>
+        <div><label for="project-status" data-i18n="dee377cfd8cd">Statut</label><select id="project-status"><option value="" data-i18n="2ff599814388">Tous</option><option value="pending" data-i18n="2f6c8477e92b">En attente</option><option value="approved" data-i18n="bdb5f6e721ba">Approuvé</option><option value="rejected" data-i18n="44a10bad0bb2">Refusé</option></select></div>
+        <div><label for="project-reservation" data-i18n="079784140f8f">Nœuds réservés</label><select id="project-reservation"><option value="" data-i18n="2ff599814388">Tous</option><option value="reserved" data-i18n="a4d8492c6319">Avec réservation</option><option value="shared" data-i18n="52359299360a">Sans réservation</option></select></div>
+        <div><label for="project-sort" data-i18n="f138990301f9">Tri</label><select id="project-sort"><option value="recent" data-i18n="13e425d2c507">Plus récents</option><option value="name" data-i18n="eb6a11444f32">Nom (A–Z)</option></select></div>
+        <div><label for="project-size" data-i18n="974597d958b8">Par page</label><select id="project-size"><option>25</option><option>50</option><option>100</option></select></div>
+        <button class="secondary" type="reset" data-i18n="5b35e0e35591">Réinitialiser</button>
       </form>
       <p id="list-notice" role="status"></p>
-      <div class="table-scroll" role="region" aria-label="Tableau des projets" tabindex="0">
+      <div class="table-scroll" role="region" aria-label="Tableau des projets" tabindex="0" data-i18n-aria-label="414ff5d781a9">
         <table>
-          <thead><tr><th scope="col">Projet</th><th scope="col">Établissement et contact</th><th scope="col">Statut</th><th scope="col">Nœuds réservés</th><th scope="col">Demandes</th></tr></thead>
-          <tbody id="project-rows"><tr><td colspan="5">Chargement…</td></tr></tbody>
+          <thead><tr><th scope="col" data-i18n="9c466199f8ec">Projet</th><th scope="col" data-i18n="41346b729ca4">Établissement et contact</th><th scope="col" data-i18n="dee377cfd8cd">Statut</th><th scope="col" data-i18n="079784140f8f">Nœuds réservés</th><th scope="col" data-i18n="32965a3c3ca0">Demandes</th></tr></thead>
+          <tbody id="project-rows"><tr><td colspan="5" data-i18n="66474911d953">Chargement…</td></tr></tbody>
         </table>
       </div>
       <div class="pagination">
         <span id="project-page"></span>
-        <button id="project-previous" type="button" class="secondary" disabled>Précédente</button>
-        <button id="project-next" type="button" class="secondary" disabled>Suivante</button>
+        <button id="project-previous" type="button" class="secondary" disabled data-i18n="9aff6c5679b2">Précédente</button>
+        <button id="project-next" type="button" class="secondary" disabled data-i18n="faf9a798db90">Suivante</button>
+      </div>
+    </section>
+    <section class="panel contribution-panel" aria-labelledby="contributions-title">
+      <h2 id="contributions-title" data-i18n="admin.contributions">Offres de contribution matérielle</h2>
+      <p id="contributions-notice" role="status"></p>
+      <div class="table-scroll" role="region" aria-labelledby="contributions-title" tabindex="0">
+        <table>
+          <thead><tr>
+            <th scope="col" data-i18n="landing.institution">Établissement ou laboratoire</th>
+            <th scope="col" data-i18n="landing.technical-contact">Adresse e-mail du contact technique</th>
+            <th scope="col" data-i18n="landing.node-count">Nombre de postes</th>
+            <th scope="col" data-i18n="landing.models">Modèles de NPU</th>
+            <th scope="col" data-i18n="admin.contribution-date">Date de réception</th>
+          </tr></thead>
+          <tbody id="contribution-rows"><tr><td colspan="5" data-i18n="66474911d953">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="contributions-page"></span>
+        <button id="contributions-refresh" type="button" class="secondary" data-i18n="d7d646faaecb">Actualiser</button>
+        <button id="contributions-previous" type="button" class="secondary" disabled data-i18n="9aff6c5679b2">Précédente</button>
+        <button id="contributions-next" type="button" class="secondary" disabled data-i18n="faf9a798db90">Suivante</button>
       </div>
     </section>
   </main>

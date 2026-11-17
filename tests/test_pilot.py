@@ -1,5 +1,6 @@
 import base64
 import hmac
+import json
 import tempfile
 import time
 import unittest
@@ -51,6 +52,72 @@ class PilotTests(unittest.TestCase):
         self.assertEqual(self.client.get("/admin/enrollment-invites", auth=self.admin).json["invites"][0]["uses"], 1)
         self.assertEqual(self.client.post("/admin/enrollment-invites/1/revoke", json={}, auth=self.admin).status_code, 200)
         self.assertEqual(enroll("c").status_code, 401)
+
+    def test_hardware_offer_is_private_and_separate_from_projects(self):
+        offer = {"affiliation": "Campus A", "contact": "operator@example.org",
+                 "node_count": 12, "models": "Intel AI Boost"}
+        for count in ("12", True, 0, 100001):
+            invalid = self.client.post("/v1/contributions", json=offer | {"node_count": count})
+            self.assertEqual(invalid.status_code, 400)
+        invalid = self.client.post("/v1/contributions", json=offer | {"contact": "operator"})
+        self.assertEqual(invalid.status_code, 400)
+        response = self.client.post("/v1/contributions", json=offer)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(set(response.json), {"id"})
+        self.assertEqual(self.client.get("/admin/contributions/data").status_code, 401)
+        data = self.client.get("/admin/contributions/data", auth=self.admin).json
+        stored, = data["contributions"]
+        self.assertEqual((stored["id"], stored["institution"], stored["contact"], stored["node_count"], stored["models"]),
+                         (response.json["id"], offer["affiliation"], offer["contact"], offer["node_count"], offer["models"]))
+        projects = self.client.get("/admin/projects/data", auth=self.admin).json["projects"]
+        self.assertEqual([project["name"] for project in projects], ["Test"])
+
+    def test_public_node_waits_for_fleet_approval(self):
+        identity = "p" * 43
+        address = "/v1/node/contribute"
+        registration = {"identity": identity, "name": "Volunteer workstation"}
+        with patch.object(server, "PUBLIC_ENROLLMENT", False):
+            self.assertEqual(self.client.post(address, json=registration).status_code, 404)
+        with patch.object(server, "PUBLIC_ENROLLMENT", True):
+            created = self.client.post(address, json=registration)
+            self.assertEqual(created.status_code, 201)
+            self.assertTrue(created.json["pending"])
+            identifier = created.json["id"]
+            self.assertEqual(self.client.post(address, json=registration).json, created.json)
+            heartbeat = {"device": "NPU", "capsule": CAPSULE}
+            headers = {"Authorization": f"Bearer {identity}"}
+            self.assertEqual(self.client.post("/v1/node/claim", headers=headers, json=heartbeat).status_code, 403)
+            row, = self.client.get("/admin/fleet?status=disabled", auth=self.admin).json["nodes"]
+            self.assertTrue(row["awaiting_approval"])
+            self.assertEqual(self.client.post(f"/admin/nodes/{identifier}/enable", json={}, auth=self.admin).status_code, 200)
+            self.assertEqual(self.client.post("/v1/node/claim", headers=headers, json=heartbeat).status_code, 200)
+            self.assertFalse(self.client.post(address, json=registration).json["pending"])
+
+    def test_pilot_hides_unsigned_agent_release(self):
+        folder = self.root / "agent-releases"
+        folder.mkdir()
+        name = "OpenNpuAgent-0.3.3-windows-x64.zip"
+        setup = "OPEN-NPU-Setup-0.3.3-windows-x64.exe"
+        content = b"test release"
+        (folder / name).write_bytes(content)
+        (folder / setup).write_bytes(b"test setup")
+        (folder / "latest.json").write_text(json.dumps({
+            "version": "0.3.3", "size": len(content), "sha256": server.digest(content.decode()),
+            "signed": False,
+        }), encoding="utf-8")
+        self.assertEqual(self.client.get("/downloads/agent/latest.json").status_code, 404)
+        self.assertEqual(self.client.get(f"/downloads/agent/{name}").status_code, 404)
+        self.assertEqual(self.client.get(f"/downloads/agent/{setup}").status_code, 404)
+        with patch.object(server, "PILOT", False):
+            release = self.client.get("/downloads/agent/latest.json").json
+            self.assertEqual(release["url"], f"/downloads/agent/{name}")
+            self.assertEqual(release["setup_url"], f"/downloads/agent/{setup}")
+            with self.client.get(release["setup_url"]) as download:
+                self.assertEqual(download.data, b"test setup")
+            with self.client.get(release["url"]) as download:
+                self.assertEqual(download.data, content)
+                self.assertIn("attachment", download.headers["Content-Disposition"])
+            self.assertEqual(self.client.get("/downloads/agent/latest.exe").status_code, 404)
 
     def test_job_retries_conflict_cancellation_and_restoration(self):
         def submit():
@@ -170,3 +237,23 @@ class PilotTests(unittest.TestCase):
         claim = self.client.post("/v1/node/claim", json={"device":"NPU","capsule":CAPSULE},
                                  headers={"Authorization":"Bearer node"})
         self.assertEqual(claim.json["task"]["job"], new)
+
+    def test_operations_tracks_active_and_unique_completion(self):
+        self.assertEqual(self.client.get("/admin/operations/data").status_code, 401)
+        with server.database() as db:
+            db.execute("INSERT INTO nodes(name,secret) VALUES ('Poste',?)", (server.digest("monitor-node"),))
+        job = self.client.post("/v1/jobs", json=self.payload, headers=self.headers).json["id"]
+        headers = {"Authorization": "Bearer monitor-node"}
+        lease = self.client.post("/v1/node/claim", json={"device": "NPU", "capsule": CAPSULE},
+                                 headers=headers).json["task"]
+        snapshot = self.client.get("/admin/operations/data", auth=self.admin).json
+        self.assertEqual(snapshot["counts"]["working"], 1)
+        self.assertEqual(snapshot["active"][0]["job"], job)
+        self.assertNotIn("lease", snapshot["active"][0])
+        for _ in range(2):
+            self.assertEqual(self.client.post("/v1/node/result", json=lease | {"values": [4, 9]},
+                                              headers=headers).status_code, 200)
+        snapshot = self.client.get("/admin/operations/data", auth=self.admin).json
+        self.assertFalse(snapshot["active"])
+        self.assertEqual(snapshot["counts"]["online"], 1)
+        self.assertEqual(sum(point["completed"] for point in snapshot["trend"]), 1)

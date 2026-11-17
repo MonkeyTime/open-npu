@@ -1,5 +1,6 @@
 """Icône OPEN-NPU de la zone de notification Windows."""
 
+import ctypes
 import logging
 import subprocess
 from threading import Event, Thread
@@ -122,12 +123,13 @@ def show_settings(preferences, stop, version=None):
         root.destroy()
 
 
-def run_tray(log_file, preferences, run_agent, *, version=None):
+def run_tray(log_file, preferences, run_agent, *, version=None, updates=None):
     stop = Event()
     status = "Démarrage"
     colors = {"ready": "#74e4a3", "working": "#8ccbff", "waiting": "#ffd182", "error": "#ff948a"}
     images = {key: icon_image(color) for key, color in colors.items()}
     settings_open = Event()
+    update_open = Event()
     settings_thread = None
 
     def toggle_share(icon, item):
@@ -164,10 +166,53 @@ def run_tray(log_file, preferences, run_agent, *, version=None):
         preferences.changed.set()
         icon.stop()
 
+    def open_updates(icon, item):
+        import webbrowser
+
+        try:
+            if not webbrowser.open(updates.connection() + "/#agent"):
+                raise OSError("Navigateur indisponible.")
+        except (OSError, ValueError, KeyError):
+            logging.exception("Impossible d’ouvrir la page de mise à jour.")
+            icon.notify("Impossible d’ouvrir la page de mise à jour.", "OPEN-NPU")
+
+    def notify_update(release):
+        try:
+            tray.update_menu()
+            tray.notify(f"Version {release['version']} téléchargée. Choisissez « Installer la mise à jour » dans le menu OPEN-NPU.",
+                        "OPEN-NPU")
+        except OSError:
+            logging.exception("Impossible d’afficher la notification de mise à jour.")
+
+    def install_update(icon, item):
+        release = updates.ready()
+        if release is None or update_open.is_set():
+            return
+        update_open.set()
+
+        def confirm():
+            try:
+                message = f"Installer OPEN-NPU {release['version']} ? L’agent va redémarrer."
+                if not release["signed"]:
+                    message += "\n\nCette version d’essai locale est non signée."
+                # MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SETFOREGROUND
+                if ctypes.windll.user32.MessageBoxW(None, message, "OPEN-NPU", 0x10124) == 6:
+                    updates.install_ready(release)
+            except Exception:
+                logging.exception("Impossible d’installer la mise à jour.")
+                icon.notify("Échec de la mise à jour. Consultez updates\\install.log.", "OPEN-NPU")
+            finally:
+                update_open.clear()
+
+        Thread(target=confirm, name="open-npu-update-confirmation", daemon=True).start()
+
     tray = Icon("OPEN-NPU", images["waiting"], f"OPEN-NPU · {status}", Menu(
         MenuItem(lambda _: status, None, enabled=False),
         MenuItem(lambda _: "Activer le partage" if preferences.snapshot()[0] else "Désactiver le partage", toggle_share),
         MenuItem("Paramètres…", open_settings),
+        MenuItem("Téléchargements et mises à jour…", open_updates, visible=updates is not None),
+        MenuItem("Installer la mise à jour…", install_update,
+                 visible=lambda _: updates is not None and updates.installed and updates.ready() is not None),
         MenuItem("Ouvrir le journal", open_log),
         Menu.SEPARATOR,
         MenuItem("Quitter", quit_agent),
@@ -189,6 +234,8 @@ def run_tray(log_file, preferences, run_agent, *, version=None):
 
     def setup(icon):
         icon.visible = True
+        if updates is not None and updates.installed:
+            Thread(target=updates.watch, args=(stop, notify_update), name="open-npu-updates", daemon=True).start()
         worker.start()
 
     try:

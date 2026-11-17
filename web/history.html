@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Historique · OPEN-NPU</title>
+  <title data-i18n="5e9c3d50ea33">Historique · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <link rel="stylesheet" href="/assets/history.css">
@@ -12,37 +13,38 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history" aria-current="page">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" aria-current="page" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="admin">
     <div class="console-heading">
-      <div><p class="section-label">Administration</p><h1>Historique</h1></div>
-      <div class="toolbar"><a class="project-directory-link" href="/admin">Retour à la flotte ↗</a><button type="button" id="history-refresh" class="secondary">Actualiser</button></div>
+      <div><p class="section-label" data-i18n="4b42c6690ebe">Administration</p><h1 data-i18n="865df3324ad9">Historique</h1></div>
+      <div class="toolbar"><a class="project-directory-link" href="/admin" data-i18n="f2fdb44d3353">Retour à la flotte ↗</a><button type="button" id="history-refresh" class="secondary" data-i18n="d7d646faaecb">Actualiser</button></div>
     </div>
     <section class="panel history-panel" aria-labelledby="history-title">
-      <div class="fleet-title"><h2 id="history-title">Journal des actions</h2><span id="history-total" class="muted"></span></div>
+      <div class="fleet-title"><h2 id="history-title" data-i18n="d82bf9a6f38f">Journal des actions</h2><span id="history-total" class="muted"></span></div>
       <form id="history-filters" class="history-filters">
-        <div><label for="action">Type d’action</label><select id="action" name="action"><option value="">Toutes les actions</option></select></div>
-        <div><label for="actor">Origine</label><select id="actor" name="actor"><option value="">Toutes</option><option value="admin">Administration</option><option value="agent">Agent</option></select></div>
-        <div><label for="project">Projet</label><input id="project" name="project" type="search" maxlength="160" placeholder="Nom ou identifiant"></div>
-        <div><label for="node">Nœud</label><input id="node" name="node" type="search" maxlength="160" placeholder="Nom ou identifiant"></div>
-        <div><label for="from">Du</label><input id="from" type="date"></div>
-        <div><label for="until">Au</label><input id="until" type="date"></div>
-        <div><label for="size">Par page</label><select id="size" name="size"><option>25</option><option>50</option><option>100</option></select></div>
-        <div class="toolbar"><button>Appliquer</button><button type="reset" class="secondary">Réinitialiser</button></div>
+        <div><label for="action" data-i18n="d844155ea8d3">Type d’action</label><select id="action" name="action"><option value="" data-i18n="2e56a9c80901">Toutes les actions</option></select></div>
+        <div><label for="actor" data-i18n="b348af6c7fc0">Origine</label><select id="actor" name="actor"><option value="" data-i18n="42623b97b481">Toutes</option><option value="admin" data-i18n="4b42c6690ebe">Administration</option><option value="agent" data-i18n="11b39c93777e">Agent</option></select></div>
+        <div><label for="project" data-i18n="9c466199f8ec">Projet</label><input id="project" name="project" type="search" maxlength="160" placeholder="Nom ou identifiant" data-i18n-placeholder="b65d69419f96"></div>
+        <div><label for="node" data-i18n="82181f9a5a46">Nœud</label><input id="node" name="node" type="search" maxlength="160" placeholder="Nom ou identifiant" data-i18n-placeholder="b65d69419f96"></div>
+        <div><label for="from" data-i18n="0b6722a8adfb">Du</label><input id="from" type="date"></div>
+        <div><label for="until" data-i18n="3325c2b56f2b">Au</label><input id="until" type="date"></div>
+        <div><label for="size" data-i18n="974597d958b8">Par page</label><select id="size" name="size"><option>25</option><option>50</option><option>100</option></select></div>
+        <div class="toolbar"><button data-i18n="b4c8b1dd7acd">Appliquer</button><button type="reset" class="secondary" data-i18n="5b35e0e35591">Réinitialiser</button></div>
       </form>
       <p id="history-notice" role="status"></p>
-      <div class="table-scroll" role="region" aria-label="Tableau de l’historique" tabindex="0">
+      <div class="table-scroll" role="region" aria-label="Tableau de l’historique" tabindex="0" data-i18n-aria-label="8a7be4f20b3b">
         <table>
-          <thead><tr><th scope="col">Date et heure</th><th scope="col">Action</th><th scope="col">Origine</th><th scope="col">Projets et nœuds</th><th scope="col">Effet</th></tr></thead>
-          <tbody id="history-rows"><tr><td colspan="5">Chargement…</td></tr></tbody>
+          <thead><tr><th scope="col" data-i18n="4891cd042a20">Date et heure</th><th scope="col" data-i18n="64cff1319d2f">Action</th><th scope="col" data-i18n="b348af6c7fc0">Origine</th><th scope="col" data-i18n="6673db6a1502">Projets et nœuds</th><th scope="col" data-i18n="27a2555e059e">Effet</th></tr></thead>
+          <tbody id="history-rows"><tr><td colspan="5" data-i18n="66474911d953">Chargement…</td></tr></tbody>
         </table>
       </div>
       <div class="pagination">
         <span id="history-page"></span>
-        <button type="button" id="history-previous" class="secondary" disabled>Précédente</button>
-        <button type="button" id="history-next" class="secondary" disabled>Suivante</button>
+        <button type="button" id="history-previous" class="secondary" disabled data-i18n="9aff6c5679b2">Précédente</button>
+        <button type="button" id="history-next" class="secondary" disabled data-i18n="faf9a798db90">Suivante</button>
       </div>
     </section>
   </main>

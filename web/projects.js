@@ -1,9 +1,10 @@
+import { t, language } from "./i18n.js";
 import {api, element, transferredSelection, clearTransferredSelection} from "./portal.js";
 
 const find = (id) => document.getElementById(id);
-const statuses = {pending: "En attente", approved: "Approuvé", rejected: "Refusé"};
-const taskLabels = {queued: "En attente", running: "En cours", done: "Terminés", failed: "En échec", cancelled: "Annulés"};
-const date = new Intl.DateTimeFormat("fr-FR", {dateStyle: "short", timeStyle: "short"});
+const statuses = {pending: t("En attente"), approved: t("Approuvé"), rejected: t("Refusé")};
+const taskLabels = {queued: t("En attente"), running: t("En cours"), done: t("Terminés"), failed: t("En échec"), cancelled: t("Annulés")};
+const date = new Intl.DateTimeFormat(language, {dateStyle: "short", timeStyle: "short"});
 
 function notice(id, message, error = false) {
   const target = find(id);
@@ -33,6 +34,45 @@ function rowsOrEmpty(body, rows, columns, message) {
   body.replaceChildren(...rows);
 }
 
+function renderContributions() {
+  const previous = find("contributions-previous");
+  const next = find("contributions-next");
+  const refresh = find("contributions-refresh");
+  const number = new Intl.NumberFormat(language);
+  let page = 1;
+  let pages = 1;
+
+  async function load(requested = page) {
+    previous.disabled = next.disabled = refresh.disabled = true;
+    try {
+      const data = await api(`/admin/contributions/data?page=${requested}`);
+      ({page, pages} = data);
+      rowsOrEmpty(find("contribution-rows"), data.contributions.map((item) => {
+        const row = document.createElement("tr");
+        for (const value of [item.institution, item.contact, number.format(item.node_count), item.models,
+          date.format(new Date(item.created * 1000))]) row.append(element("td", value));
+        return row;
+      }), 5, t("Aucune offre de contribution."));
+      find("contributions-page").textContent = t("Page {0} sur {1}", number.format(page), number.format(pages));
+      notice("contributions-notice", "");
+    } catch (error) {
+      notice("contributions-notice", error.message, true);
+      const loading = find("contribution-rows").querySelector("[data-i18n]");
+      if (loading) loading.textContent = "—";
+    } finally {
+      previous.disabled = page <= 1;
+      next.disabled = page >= pages;
+      refresh.disabled = false;
+    }
+  }
+  previous.addEventListener("click", () => load(page - 1));
+  next.addEventListener("click", () => load(page + 1));
+  refresh.addEventListener("click", () => load());
+  load();
+}
+
+if (find("contribution-rows")) renderContributions();
+
 function renderList() {
   const search = find("project-search");
   const status = find("project-status");
@@ -51,10 +91,10 @@ function renderList() {
 
   const selection = transferredSelection();
   if (selection.length) {
-    notice("selection-bridge", `Sélection de la flotte : ${selection.length} nœud(s). Ouvrez un projet approuvé pour l’affecter.`);
+    notice("selection-bridge", t("Sélection de la flotte : {0} nœud(s). Ouvrez un projet approuvé pour l’affecter.", selection.length));
   }
 
-  for (const [key, label] of Object.entries({"": "Tous les projets", ...statuses})) {
+  for (const [key, label] of Object.entries({"": t("Tous les projets"), ...statuses})) {
     const card = button(label, () => {
       status.value = key;
       filter();
@@ -75,7 +115,7 @@ function renderList() {
     if (project.contact) contact.append(element("small", project.contact));
     const state = document.createElement("td");
     state.append(badge(project.status));
-    row.append(title, contact, state, element("td", project.reserved), element("td", project.jobs));
+    row.append(title, contact, state, element("td", project.dedicated && !project.reserved ? t("À remplacer") : project.reserved), element("td", project.jobs));
     return row;
   }
 
@@ -94,15 +134,14 @@ function renderList() {
         count.textContent = key ? data.counts[key] ?? 0 : Object.values(data.counts).reduce((sum, n) => sum + n, 0);
         card.setAttribute("aria-pressed", String(key === status.value));
       }
-      const suffix = data.total === 1 ? "" : "s";
-      find("project-total").textContent = `${data.total} projet${suffix}`;
-      find("project-page").textContent = `Page ${page} sur ${pages}`;
+      find("project-total").textContent = t("Projets : {0}", data.total);
+      find("project-page").textContent = t("Page {0} sur {1}", page, pages);
       previous.disabled = page <= 1;
       next.disabled = page >= pages;
-      rowsOrEmpty(find("project-rows"), data.projects.map(projectRow), 5, "Aucun projet ne correspond à ces filtres.");
+      rowsOrEmpty(find("project-rows"), data.projects.map(projectRow), 5, t("Aucun projet ne correspond à ces filtres."));
       notice("list-notice", "");
     } catch (error) {
-      if (request === revision) notice("list-notice", `Impossible de charger la liste. ${error.message}`, true);
+      if (request === revision) notice("list-notice", t("Impossible de charger la liste. {0}", error.message), true);
     }
   }
 
@@ -190,23 +229,23 @@ function renderDetail() {
     const actions = find("access-actions");
     actions.replaceChildren();
     if (project.status === "pending") {
-      find("access-state").textContent = "La proposition attend une décision. L’approbation génère une clé API.";
-      actions.append(button("Approuver", () => ask("Approuver ce projet ?", "Une clé API sera créée pour soumettre des calculs.", "Approuver",
-        () => mutate("", {action: "approve"}, (result) => { notice("detail-notice", "Projet approuvé."); reveal(result.api_key); })), ""),
-      button("Refuser", () => ask("Refuser ce projet ?", "Le projet sera classé comme refusé.", "Refuser",
-        () => mutate("", {action: "reject"}, () => notice("detail-notice", "Projet refusé."))), "danger"));
+      find("access-state").textContent = t("La proposition attend une décision. L’approbation génère une clé API.");
+      actions.append(button(t("Approuver"), () => ask(t("Approuver ce projet ?"), t("Une clé API sera créée pour soumettre des calculs."), t("Approuver"),
+        () => mutate("", {action: "approve"}, (result) => { notice("detail-notice", t("Projet approuvé.")); reveal(result.api_key); })), ""),
+      button(t("Refuser"), () => ask(t("Refuser ce projet ?"), t("Le projet sera classé comme refusé."), t("Refuser"),
+        () => mutate("", {action: "reject"}, () => notice("detail-notice", t("Projet refusé.")))), "danger"));
     } else if (project.status === "approved") {
-      find("access-state").textContent = project.has_key ? "Une clé API est active." : "Aucune clé API active.";
-      actions.append(button(project.has_key ? "Remplacer la clé API" : "Générer une clé API",
-        () => ask("Générer une nouvelle clé API ?", project.has_key
-          ? "L’ancienne clé cessera de fonctionner immédiatement. Les demandes de calcul déjà soumises seront conservées."
-          : "La nouvelle clé permettra de soumettre et de consulter les calculs de ce projet.", "Générer la clé",
+      find("access-state").textContent = project.has_key ? t("Une clé API est active.") : t("Aucune clé API active.");
+      actions.append(button(project.has_key ? t("Remplacer la clé API") : t("Générer une clé API"),
+        () => ask(t("Générer une nouvelle clé API ?"), project.has_key
+          ? t("L’ancienne clé cessera de fonctionner immédiatement. Les demandes de calcul déjà soumises seront conservées.")
+          : t("La nouvelle clé permettra de soumettre et de consulter les calculs de ce projet."), t("Générer la clé"),
           () => mutate("/rotate-key", {}, (result) => {
-            notice("detail-notice", "Nouvelle clé API générée.");
+            notice("detail-notice", t("Nouvelle clé API générée."));
             reveal(result.api_key);
           }))));
     } else {
-      find("access-state").textContent = "La proposition est classée comme refusée.";
+      find("access-state").textContent = t("La proposition est classée comme refusée.");
     }
   }
 
@@ -214,27 +253,28 @@ function renderDetail() {
     const approved = project.status === "approved";
     const nodes = project.reserved_nodes;
     find("reservation-controls").hidden = !approved;
-    find("reservation-state").textContent = !approved ? "La réservation est disponible après approbation." : nodes.length
-      ? `${nodes.length} nœud(s) réservé(s), dont ${nodes.filter((node) => node.ready).length} opérationnel(s).`
-      : "Pool partagé. Vous pouvez réserver des nœuds à ce projet.";
+    find("reservation-state").textContent = !approved ? t("La réservation est disponible après approbation.") : nodes.length
+      ? t("{0} nœud(s) réservé(s), dont {1} opérationnel(s).", nodes.length, nodes.filter((node) => node.ready).length)
+      : project.dedicated ? t("Placement dédié. Le projet attend une nouvelle réservation.")
+      : t("Pool partagé. Vous pouvez réserver des nœuds à ce projet.");
     if (!approved) return;
     if (!countEdited) count.value = String(nodes.length || 1);
-    find("release-reservation").hidden = nodes.length === 0;
+    find("release-reservation").hidden = !project.dedicated;
     find("reserved-details").hidden = nodes.length === 0;
     find("reserved-nodes").replaceChildren(...nodes.map((node) => element("li",
-      `#${node.id} ${node.name} · ${node.hardware || node.device || "Profil inconnu"}${node.ready ? "" : " · Indisponible"}`)));
+      `#${node.id} ${node.name} · ${node.hardware || node.device || t("Profil inconnu")}${node.ready ? "" : t(" · Indisponible")}`)));
     const ids = transferredSelection();
     find("reserve-manual").disabled = !ids.length;
     const transfer = find("transfer-state");
-    transfer.textContent = ids.length ? `Sélection transférée : ${ids.length} nœud(s).` : "";
-    const link = element("a", ids.length ? " Modifier la sélection dans la flotte ↗" : "Sélectionner des nœuds dans la flotte ↗", "console-link");
+    transfer.textContent = ids.length ? t("Sélection transférée : {0} nœud(s).", ids.length) : "";
+    const link = element("a", ids.length ? t(" Modifier la sélection dans la flotte ↗") : t("Sélectionner des nœuds dans la flotte ↗"), "console-link");
     link.href = "/admin#flotte";
     transfer.append(link);
   }
 
   function render(project) {
     current = project;
-    find("project-id").textContent = `Fiche projet · #${project.id}`;
+    find("project-id").textContent = t("Fiche projet · #{0}", project.id);
     find("project-name").textContent = project.name;
     document.title = `${project.name} · OPEN-NPU`;
     const history = find("project-history");
@@ -260,19 +300,21 @@ function renderDetail() {
       policy.elements.per_minute.value = project.policy.per_minute ?? 30;
       policy.elements.priority.value = project.policy.priority;
     }
-    find("project-metrics").replaceChildren(...Object.entries(taskLabels).map(([key, label]) => {
-      const row = document.createElement("div");
-      row.append(element("dt", label), element("dd", project.tasks[key] ?? 0));
-      return row;
-    }));
+    for (const [id, counts] of [["project-metrics", project.tasks], ["project-pipeline", project.pipeline]]) {
+      find(id).replaceChildren(...Object.entries(taskLabels).map(([key, label]) => {
+        const row = document.createElement("div");
+        row.append(element("dt", label), element("dd", counts[key] ?? 0));
+        return row;
+      }));
+    }
     rowsOrEmpty(find("project-jobs"), project.jobs.map((job) => {
       const row = document.createElement("tr");
       const state = document.createElement("td");
-      state.append(badge(job.status, {queued: "En attente", running: "En cours", done: "Terminée", failed: "En échec", cancelled: "Annulée"}[job.status]));
+      state.append(badge(job.status, {queued: t("En attente"), running: t("En cours"), done: t("Terminée"), failed: t("En échec"), cancelled: t("Annulée")}[job.status]));
       row.append(element("td", job.id), element("td", date.format(new Date(job.created * 1000))), state,
         element("td", `${job.completed} / ${job.total}`));
       return row;
-    }), 4, "Aucune demande de calcul pour ce projet.");
+    }), 4, t("Aucune demande de calcul pour ce projet."));
   }
 
   async function load() {
@@ -281,7 +323,7 @@ function renderDetail() {
       const data = await api(route + "/data");
       if (request === revision) render(data);
     } catch (error) {
-      if (request === revision) notice("detail-notice", `Impossible d’actualiser la fiche. ${error.message}`, true);
+      if (request === revision) notice("detail-notice", t("Impossible d’actualiser la fiche. {0}", error.message), true);
     }
   }
 
@@ -291,7 +333,7 @@ function renderDetail() {
     const fields = policy.elements;
     mutate("/policy", {admissions: fields.admissions.checked, max_active: Number(fields.max_active.value),
       per_minute: Number(fields.per_minute.value), priority: Number(fields.priority.value)},
-    () => notice("detail-notice", "Règles d’admission enregistrées."));
+    () => notice("detail-notice", t("Règles d’admission enregistrées.")));
   });
   edit.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -301,7 +343,7 @@ function renderDetail() {
     submit.disabled = true;
     mutate("/metadata", values, () => {
       dirty = [...edit.querySelectorAll("[name]")].some((input) => input.value !== values[input.name]);
-      notice("detail-notice", "Informations enregistrées.");
+      notice("detail-notice", t("Informations enregistrées."));
     }).finally(() => { submit.disabled = false; });
   });
   count.addEventListener("input", () => { countEdited = true; });
@@ -311,8 +353,8 @@ function renderDetail() {
     mutate("/reservation", {count: number, ...selection}, (result) => {
       if (ids) clearTransferredSelection();
       countEdited = false;
-      const message = number === 0 ? "Réservation libérée."
-        : `${number} nœud(s) réservé(s). ${result.homogeneous ? "Profil NPU identique." : "Profils différents ou incomplets."}`;
+      const message = number === 0 ? t("Réservation libérée.")
+        : t("{0} nœud(s) réservé(s). {1}", number, result.homogeneous ? t("Profil NPU identique.") : t("Profils différents ou incomplets."));
       notice("detail-notice", message);
     });
   }
@@ -321,12 +363,12 @@ function renderDetail() {
     if (busy || !reservation.reportValidity()) return;
     const number = count.valueAsNumber;
     if (ids && ids.length !== number) {
-      notice("detail-notice", `La sélection transférée contient ${ids.length} nœud(s). Le nombre demandé doit correspondre.`, true);
+      notice("detail-notice", t("La sélection transférée contient {0} nœud(s). Le nombre demandé doit correspondre.", ids.length), true);
       return;
     }
     if (current.reserved_nodes.length) {
-      ask("Remplacer la réservation ?", `Une nouvelle réservation de ${number} nœud(s) remplacera le groupe actuel si l’effectif est disponible.`,
-        "Remplacer", () => saveReservation(number, ids));
+      ask(t("Remplacer la réservation ?"), t("Une nouvelle réservation de {0} nœud(s) remplacera le groupe actuel si l’effectif est disponible.", number),
+        t("Remplacer"), () => saveReservation(number, ids));
     } else {
       saveReservation(number, ids);
     }
@@ -334,9 +376,9 @@ function renderDetail() {
 
   reservation.addEventListener("submit", (event) => { event.preventDefault(); askReservation(); });
   find("reserve-manual").addEventListener("click", () => askReservation(transferredSelection()));
-  find("release-reservation").addEventListener("click", () => ask("Libérer les nœuds ?",
-    "Les prochains lots pourront être pris par le pool partagé. Les lots déjà pris conservent leur bail.",
-    "Libérer", () => saveReservation(0)));
+  find("release-reservation").addEventListener("click", () => ask(t("Libérer les nœuds ?"),
+    t("Les prochains lots pourront être pris par le pool partagé. Les lots déjà pris conservent leur bail."),
+    t("Libérer"), () => saveReservation(0)));
   find("reload-project").addEventListener("click", () => {
     if (!busy) { notice("detail-notice", ""); load(); }
   });

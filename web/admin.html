@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>OPEN-NPU · Administration</title>
+  <title data-i18n="72fe5317c353">OPEN-NPU · Administration</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <script type="module" src="/assets/admin.js"></script>
@@ -11,60 +12,61 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin" aria-current="page">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" aria-current="page" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="admin">
     <div class="console-heading">
-      <div><p class="section-label">Administration</p><h1>Flotte NPU</h1></div>
-      <div class="toolbar"><button type="button" id="refresh" class="secondary">Actualiser</button></div>
+      <div><p class="section-label" data-i18n="4b42c6690ebe">Administration</p><h1 data-i18n="6c69a625a1d9">Flotte NPU</h1></div>
+      <div class="toolbar"><button type="button" id="refresh" class="secondary" data-i18n="d7d646faaecb">Actualiser</button></div>
     </div>
-    <p id="connection-status" class="connection" role="status">Chargement de la flotte…</p>
-    <div class="fleet-summary" id="fleet-summary" aria-label="Filtrer par état"></div>
+    <p id="connection-status" class="connection" role="status" data-i18n="70714fd4807e">Chargement de la flotte…</p>
+    <div class="fleet-summary" id="fleet-summary" aria-label="Filtrer par état" data-i18n-aria-label="e92901a7eca6"></div>
     <section class="panel fleet" id="flotte" aria-labelledby="fleet-title">
-      <div class="fleet-title"><h2 id="fleet-title">Nœuds</h2><span id="node-total"></span></div>
-      <p class="muted">Les postes apparaissent ici dès que leur agent OPEN-NPU s’inscrit.</p>
+      <div class="fleet-title"><h2 id="fleet-title" data-i18n="3dc676ca5637">Nœuds</h2><span id="node-total"></span></div>
+      <p class="muted" data-i18n="805ddc29b846">Les postes apparaissent ici dès que leur agent OPEN-NPU s’inscrit.</p>
       <form id="filters" class="filters">
-        <div><label for="search">Rechercher</label><input type="search" id="search" maxlength="160" placeholder="Nom, identifiant ou accélérateur"></div>
-        <div><label for="node-state">État</label><select id="node-state">
-          <option value="">Tous les états</option><option value="working">En calcul</option>
-          <option value="online">Disponible</option><option value="reserved">Réservé</option><option value="paused">En pause</option><option value="offline">Hors ligne</option>
-          <option value="new">Jamais connecté</option><option value="disabled">Désactivé</option><option value="revoked">Révoqué</option>
+        <div><label for="search" data-i18n="733d1c742675">Rechercher</label><input type="search" id="search" maxlength="160" placeholder="Nom, identifiant ou accélérateur" data-i18n-placeholder="28656056a8a7"></div>
+        <div><label for="node-state" data-i18n="de4dd03297a1">État</label><select id="node-state">
+          <option value="" data-i18n="749c1a9956f0">Tous les états</option><option value="working" data-i18n="ce92b7fbf180">En calcul</option>
+          <option value="online" data-i18n="f4e4f699637b">Disponible</option><option value="reserved" data-i18n="e4280737ec40">Réservé</option><option value="paused" data-i18n="239c064e0d40">En pause</option><option value="offline" data-i18n="21bb8c75de57">Hors ligne</option>
+          <option value="new" data-i18n="0abcd96df76b">Jamais connecté</option><option value="disabled" data-i18n="da60ff35b212">Désactivé</option><option value="revoked" data-i18n="cc480a90557f">Révoqué</option>
         </select></div>
-        <div><label for="page-size">Par page</label><select id="page-size"><option>25</option><option>50</option><option>100</option></select></div>
+        <div><label for="page-size" data-i18n="974597d958b8">Par page</label><select id="page-size"><option>25</option><option>50</option><option>100</option></select></div>
       </form>
       <div class="selection-toolbar">
-        <span id="selection-count">Aucun nœud sélectionné</span>
-        <button type="button" id="enable-selected" class="secondary" disabled>Réactiver</button>
-        <button type="button" id="disable-selected" class="danger" disabled>Désactiver</button>
-        <button type="button" id="transfer-project" class="secondary" disabled>Affecter à un projet</button>
-        <button type="button" id="clear-selection" class="quiet" hidden>Effacer</button>
+        <span id="selection-count" data-i18n="ef9dc1440fb4">Aucun nœud sélectionné</span>
+        <button type="button" id="enable-selected" class="secondary" disabled data-i18n="0efc2e864fe1">Réactiver</button>
+        <button type="button" id="disable-selected" class="danger" disabled data-i18n="c07050ca8933">Désactiver</button>
+        <button type="button" id="transfer-project" class="secondary" disabled data-i18n="91ac9a7620af">Affecter à un projet</button>
+        <button type="button" id="clear-selection" class="quiet" hidden data-i18n="e4750da99f0f">Effacer</button>
       </div>
       <p id="fleet-notice" role="status"></p>
-      <div class="table-scroll" role="region" aria-label="Tableau des nœuds" tabindex="0">
+      <div class="table-scroll" role="region" aria-label="Tableau des nœuds" tabindex="0" data-i18n-aria-label="e2d1a3943bf8">
         <table>
           <thead><tr>
-            <th scope="col"><input id="select-page" type="checkbox" aria-label="Sélectionner les nœuds de cette page" disabled></th>
-            <th scope="col">Nœud</th><th scope="col">État</th><th scope="col">Accélérateur</th><th scope="col">Réseau</th><th scope="col">Dernier contact</th><th scope="col">Action</th>
+            <th scope="col"><input id="select-page" type="checkbox" aria-label="Sélectionner les nœuds de cette page" disabled data-i18n-aria-label="87501d76829c"></th>
+            <th scope="col" data-i18n="82181f9a5a46">Nœud</th><th scope="col" data-i18n="de4dd03297a1">État</th><th scope="col" data-i18n="d87add056917">Accélérateur</th><th scope="col" data-i18n="b5f96c04b748">Réseau</th><th scope="col" data-i18n="69dcb5ef2f19">Dernier contact</th><th scope="col" data-i18n="64cff1319d2f">Action</th>
           </tr></thead>
-          <tbody id="nodes"><tr><td colspan="7">Chargement…</td></tr></tbody>
+          <tbody id="nodes"><tr><td colspan="7" data-i18n="66474911d953">Chargement…</td></tr></tbody>
         </table>
       </div>
       <div class="pagination">
         <span id="page-info"></span>
-        <button type="button" id="previous" class="secondary" disabled>Précédente</button>
-        <button type="button" id="next" class="secondary" disabled>Suivante</button>
+        <button type="button" id="previous" class="secondary" disabled data-i18n="9aff6c5679b2">Précédente</button>
+        <button type="button" id="next" class="secondary" disabled data-i18n="faf9a798db90">Suivante</button>
       </div>
     </section>
     <div class="operations">
-      <section class="panel"><h2>File de calcul</h2><p id="queue-notice" role="status"></p><dl class="work-metrics" id="metrics"></dl></section>
-      <section class="panel" id="historique"><h2>Actions récentes sur la flotte</h2><ol id="events" class="events"></ol><p><a class="project-directory-link" href="/admin/history">Ouvrir le journal ↗</a></p></section>
+      <section class="panel"><h2 data-i18n="fa2eda17b194">File de calcul</h2><p id="queue-notice" role="status"></p><dl class="work-metrics" id="metrics"></dl></section>
+      <section class="panel" id="historique"><h2 data-i18n="8189bfb24c53">Actions récentes sur la flotte</h2><ol id="events" class="events"></ol><p><a class="project-directory-link" href="/admin/history" data-i18n="a6f96928a138">Ouvrir le journal ↗</a></p></section>
     </div>
   </main>
   <dialog id="confirm-action" aria-labelledby="confirm-title">
     <h2 id="confirm-title"></h2><p id="confirm-detail"></p>
     <p id="confirm-notice" role="status"></p>
-    <div class="dialog-actions"><button type="button" data-close="confirm-action" class="secondary">Annuler</button><button type="button" id="confirm-button"></button></div>
+    <div class="dialog-actions"><button type="button" data-close="confirm-action" class="secondary" data-i18n="46ad3916f6a0">Annuler</button><button type="button" id="confirm-button"></button></div>
   </dialog>
 </body>
 </html>

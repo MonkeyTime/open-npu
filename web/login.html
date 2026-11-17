@@ -2,22 +2,24 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Connexion · OPEN-NPU</title>
+  <title data-i18n="ff2d2909edea">Connexion · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <script type="module" src="/assets/login.js"></script>
 </head>
 <body class="console">
-  <header class="console-header"><a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a></header>
+  <header class="console-header"><a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>  <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
+  </header>
   <main>
     <section class="panel">
-      <h1>Connexion</h1>
+      <h1 data-i18n="61d695041034">Connexion</h1>
       <form id="login-form">
-        <label for="name">Identifiant</label><input id="name" name="name" autocomplete="username" required maxlength="48">
-        <label for="password">Mot de passe</label><input id="password" name="password" autocomplete="current-password" type="password" required maxlength="150">
-        <label for="code">Code à six chiffres, si activé</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6">
-        <button>Se connecter</button>
+        <label for="name" data-i18n="f9e7d49e4745">Identifiant</label><input id="name" name="name" autocomplete="username" required maxlength="48">
+        <label for="password" data-i18n="ff9c8b8c0677">Mot de passe</label><input id="password" name="password" autocomplete="current-password" type="password" required maxlength="150">
+        <label for="code" data-i18n="7b7c0932dd58">Code à six chiffres, si activé</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6">
+        <button data-i18n="0ac3d2cb3005">Se connecter</button>
         <p id="login-result" role="status"></p>
       </form>
     </section>

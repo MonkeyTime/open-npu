@@ -3,6 +3,7 @@
 import hashlib
 import base64
 import hmac
+from ipaddress import ip_address
 import json
 import os
 from pathlib import Path
@@ -11,13 +12,16 @@ import secrets
 import sqlite3
 import struct
 import time
-from collections import defaultdict
+from threading import Event, Lock, Thread
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 
-from flask import Flask, abort, g, has_request_context, jsonify, request
+from flask import Flask, abort, g, has_request_context, jsonify, request, send_from_directory
 from waitress import serve
 
 from capsule import CAPSULE, MAX_VALUES, WIDTH, valid_values
+from capsule_manifest import MAX_TENSOR
+from capsule_pipeline import expire_pipeline, initialize_pipeline, install_routes, migrate_pipeline, pipeline_busy
 from network import (MAX_RATE, MIN_UPLOAD_LIMIT, PROBE_BYTES, PROBE_INTERVAL, SAMPLE_VALID_SECONDS,
                      fits_lease, optional_number, transfer_profile)
 
@@ -28,6 +32,7 @@ MODE = os.environ.get("OPEN_NPU_MODE", "local")
 if MODE not in ("local", "pilot"):
     raise RuntimeError("OPEN_NPU_MODE doit être local ou pilot.")
 PILOT = MODE == "pilot"
+PUBLIC_ENROLLMENT = os.environ.get("OPEN_NPU_PUBLIC_ENROLLMENT", "0" if PILOT else "1") == "1"
 app = Flask(__name__, static_folder=str(ROOT / "web"), static_url_path="/assets")
 app.config["MAX_CONTENT_LENGTH"] = 96 * 1024
 if PILOT:
@@ -56,6 +61,48 @@ HISTORY_ACTIONS = ("node_enrolled", "node_created", "enable", "disable", "projec
                    "invite_created", "invite_revoked", "admin_created", "admin_revoked", "key_created", "key_revoked",
                    "node_revoked", "job_cancelled", "job_retried", "project_policy_updated")
 ROLES = ("owner", "operator", "reader")
+
+
+rate_lock = Lock()
+rate_buckets = OrderedDict()
+AUTH_BUDGETS = {
+    "/admin/session": ("login", 12, 0.2),
+    "/v1/node/enroll": ("enrollment", 120, 2),
+    "/v1/node/contribute": ("public_enrollment", 10, 0.05),
+    "/v1/projects": ("application", 12, 0.2),
+    "/v1/contributions": ("application", 12, 0.2),
+}
+
+
+@app.before_request
+def limit_pilot_requests():
+    if not PILOT or request.method == "OPTIONS":
+        return
+    path = request.path
+    if not path.startswith(("/v1/", "/v2/", "/admin/")):
+        return
+    source = request.remote_addr or ""
+    if os.environ.get("OPEN_NPU_PRIVATE_PROXY") == "1":
+        source = request.headers.get("X-Open-NPU-Client", source)
+    try:
+        address = ip_address(source)
+        # Group IPv6 privacy addresses belonging to the same subnet.
+        client = str(address.ipv4_mapped or (int(address) >> 64)) if address.version == 6 else str(address)
+    except ValueError:
+        client = "unknown"
+    group, burst, rate = AUTH_BUDGETS.get(path, ("api", 200, 20)) if request.method == "POST" else ("api", 200, 20)
+    key = client, group
+    now = time.monotonic()
+    with rate_lock:
+        balance, previous = rate_buckets.pop(key, (burst, now))
+        balance = min(burst, balance + max(0, now - previous) * rate)
+        allowed = balance >= 1
+        rate_buckets[key] = (balance - int(allowed), now)
+        if len(rate_buckets) > 16384:
+            rate_buckets.popitem(last=False)
+    if not allowed:
+        retry = max(1, int((1 - balance) / rate + 1))
+        return jsonify(error="Trop de requêtes. Réessayez après le délai indiqué."), 429, {"Retry-After": str(retry)}
 
 
 @contextmanager
@@ -94,10 +141,19 @@ def initialize():
                 status TEXT NOT NULL DEFAULT 'pending', api_key TEXT UNIQUE,
                 affiliation TEXT, contact TEXT
             );
+            CREATE TABLE IF NOT EXISTS contributions (
+                id INTEGER PRIMARY KEY, institution TEXT NOT NULL, contact TEXT NOT NULL,
+                node_count INTEGER NOT NULL CHECK(node_count BETWEEN 1 AND 100000),
+                models TEXT NOT NULL, created REAL NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS nodes (
                 id INTEGER PRIMARY KEY, name TEXT NOT NULL, secret TEXT NOT NULL UNIQUE,
                 seen REAL, device TEXT, enabled INTEGER NOT NULL DEFAULT 1,
                 hardware TEXT, capsule TEXT, paused INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS public_node_enrollments (
+                node INTEGER PRIMARY KEY REFERENCES nodes(id),
+                approved INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS project_nodes (
                 node INTEGER PRIMARY KEY REFERENCES nodes(id),
@@ -173,13 +229,29 @@ def initialize():
             CREATE INDEX IF NOT EXISTS tasks_node ON tasks(node) WHERE status='running';
             CREATE INDEX IF NOT EXISTS tasks_expires ON tasks(expires) WHERE status='running';
             CREATE INDEX IF NOT EXISTS tasks_failed ON tasks(job) WHERE status='failed';
+            CREATE TABLE IF NOT EXISTS completion_minutes (
+                minute INTEGER PRIMARY KEY, completed INTEGER NOT NULL
+            );
         """)
+        initialize_pipeline(db)
         db.execute("BEGIN IMMEDIATE")
+        migrate_pipeline(db)
+        db.execute("INSERT OR IGNORE INTO settings VALUES ('completion_tracking',?)", (str(int(time.time())),))
         columns = {column["name"] for column in db.execute("PRAGMA table_info(projects)")}
         if "affiliation" not in columns:
             db.execute("ALTER TABLE projects ADD COLUMN affiliation TEXT")
         if "contact" not in columns:
             db.execute("ALTER TABLE projects ADD COLUMN contact TEXT")
+        if "dedicated" not in columns:
+            db.execute("ALTER TABLE projects ADD COLUMN dedicated INTEGER NOT NULL DEFAULT 0")
+            db.execute("""
+                UPDATE projects SET dedicated=1 WHERE id IN (SELECT project FROM project_nodes)
+                   OR 'nodes_reserved'=(
+                       SELECT e.action FROM history_projects h JOIN history_events e ON e.id=h.event
+                       WHERE h.project=projects.id AND e.action IN ('nodes_reserved','reservation_released')
+                       ORDER BY e.id DESC LIMIT 1
+                   )
+            """)
         node_columns = {column["name"] for column in db.execute("PRAGMA table_info(nodes)")}
         if "hardware" not in node_columns:
             db.execute("ALTER TABLE nodes ADD COLUMN hardware TEXT")
@@ -354,6 +426,7 @@ def field(data, key, limit):
 @app.errorhandler(413)
 @app.errorhandler(415)
 @app.errorhandler(429)
+@app.errorhandler(503)
 def show_error(error):
     response = jsonify(error=error.description)
     if error.code == 401 and request.path.startswith("/admin") and request.path != "/admin/session":
@@ -389,6 +462,88 @@ def home():
     return app.send_static_file("index.html")
 
 
+def latest_agent_release():
+    directory = RUNTIME / "agent-releases"
+    try:
+        release = json.loads((directory / "latest.json").read_text(encoding="utf-8-sig"))
+        version = release["version"]
+        if (not re.fullmatch(r"[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}", version)
+                or not re.fullmatch(r"[0-9a-f]{64}", release["sha256"])
+                or type(release["signed"]) is not bool or (PILOT and not release["signed"])
+                or type(release["size"]) is not int or release["size"] <= 0):
+            abort(404)
+        filename = f"OpenNpuAgent-{version}-windows-x64.zip"
+        archive = directory / filename
+        if archive.is_symlink() or archive.stat().st_size != release["size"]:
+            abort(404)
+    except (OSError, ValueError, KeyError, TypeError):
+        abort(404)
+    return release, filename
+
+
+def agent_setup(release):
+    if not PUBLIC_ENROLLMENT or (PILOT and not release["signed"]):
+        return None
+    suffix = "-signed" if release["signed"] else ""
+    filename = f"OPEN-NPU-Setup-{release['version']}-windows-x64{suffix}.exe"
+    setup = RUNTIME / "agent-releases" / filename
+    return filename if setup.is_file() and not setup.is_symlink() else None
+
+
+@app.get("/downloads/agent/latest.json")
+def agent_release_data():
+    release, filename = latest_agent_release()
+    setup = agent_setup(release)
+    data = dict(version=release["version"], sha256=release["sha256"], size=release["size"],
+                signed=release["signed"], url=f"/downloads/agent/{filename}", public_enrollment=PUBLIC_ENROLLMENT)
+    if setup:
+        data["setup_url"] = f"/downloads/agent/{setup}"
+    return jsonify(data)
+
+
+@app.get("/downloads/agent/<filename>")
+def agent_download(filename):
+    release, published = latest_agent_release()
+    if filename == agent_setup(release):
+        return send_from_directory(RUNTIME / "agent-releases", filename, as_attachment=True,
+                                   mimetype="application/octet-stream")
+    if filename != published:
+        abort(404)
+    return send_from_directory(RUNTIME / "agent-releases", published, as_attachment=True, mimetype="application/zip")
+
+
+@app.get("/docs/api")
+def api_documentation():
+    return app.send_static_file("api-docs.html")
+
+
+@app.get("/docs/openapi.json")
+def openapi_contract():
+    language = request.args.get("lang", "")
+    if re.fullmatch(r"[a-z]{2}", language):
+        catalogue = ROOT / "web" / "locales" / f"{language}.json"
+        if catalogue.is_file():
+            translations = json.loads(catalogue.read_text(encoding="utf-8"))
+            spec = json.loads((ROOT / "docs" / "openapi.json").read_text(encoding="utf-8"))
+
+            def localize(value):
+                if isinstance(value, list):
+                    for item in value:
+                        localize(item)
+                elif isinstance(value, dict):
+                    for key, item in value.items():
+                        if key in {"title", "summary", "description"} and isinstance(item, str):
+                            value[key] = translations.get(item, item)
+                        else:
+                            localize(item)
+
+            localize(spec)
+            return jsonify(spec), 200, {"Content-Language": language}
+    response = send_from_directory(ROOT / "docs", "openapi.json", mimetype="application/json")
+    response.headers["Content-Language"] = "fr"
+    return response
+
+
 @app.get("/admin")
 def dashboard():
     with database() as db:
@@ -422,11 +577,18 @@ def login():
     password = field(data, "password", 150)
     now = time.time()
     session = token()
-    with database() as db:
-        db.execute("BEGIN IMMEDIATE")
+    password_hash = digest(password)
+
+    def credentials(db):
         row = db.execute("SELECT secret,totp,last_totp FROM administrators WHERE name=? AND revoked=0", (name,)).fetchone()
-        if row is None or not secrets.compare_digest(row["secret"], digest(password)):
+        if row is None or not secrets.compare_digest(row["secret"], password_hash):
             abort(401, description="Identifiants ou code invalide.")
+        return row
+
+    with database() as db:
+        credentials(db)
+        db.execute("BEGIN IMMEDIATE")
+        row = credentials(db)
         if row["totp"]:
             counter = totp_counter(row["totp"], data.get("code"), now, row["last_totp"])
             if counter is None:
@@ -606,6 +768,41 @@ def submit_project():
         return jsonify(id=cursor.lastrowid, status="pending"), 201
 
 
+@app.post("/v1/contributions")
+def submit_contribution():
+    data = payload()
+    institution = field(data, "affiliation", 150)
+    contact = field(data, "contact", 254)
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+", contact):
+        abort(400, description="Adresse de contact invalide.")
+    count = data.get("node_count")
+    if type(count) is not int or not 1 <= count <= 100000:
+        abort(400, description="Indiquez entre 1 et 100 000 postes.")
+    models = field(data, "models", 500)
+    with database() as db:
+        cursor = db.execute("""
+            INSERT INTO contributions(institution,contact,node_count,models,created) VALUES (?,?,?,?,?)
+        """, (institution, contact, count, models, time.time()))
+        return jsonify(id=cursor.lastrowid), 201
+
+
+@app.get("/admin/contributions/data")
+def contributions_data():
+    page = request.args.get("page", 1, type=int)
+    if not 1 <= page <= 1_000_000:
+        abort(400, description="Filtres ou pagination invalides.")
+    with database() as db:
+        admin(db)
+        db.execute("BEGIN")
+        pages = max(1, (db.execute("SELECT count(*) FROM contributions").fetchone()[0] + 24) // 25)
+        page = min(page, pages)
+        rows = db.execute("""
+            SELECT id,institution,contact,node_count,models,created
+            FROM contributions ORDER BY id DESC LIMIT 25 OFFSET ?
+        """, ((page - 1) * 25,))
+        return jsonify(contributions=[dict(row) for row in rows], page=page, pages=pages)
+
+
 @app.get("/admin/projects")
 def projects_page():
     with database() as db:
@@ -623,7 +820,7 @@ def project_page(project_id):
 
 def read_project(db, project_id):
     row = None if project_id > 2**63 - 1 else db.execute("""
-        SELECT id,name,description,status,affiliation,contact,api_key IS NOT NULL AS has_key
+        SELECT id,name,description,status,affiliation,contact,dedicated,api_key IS NOT NULL AS has_key
         FROM projects WHERE id=?
     """, (project_id,)).fetchone()
     if row is None:
@@ -651,8 +848,8 @@ def project_list():
             OR instr(fold(coalesce(p.contact,'')),?)>0 OR CAST(p.id AS TEXT)=?)""")
         params.extend([search] * 4)
     if reservation:
-        exists = "EXISTS (SELECT 1 FROM project_nodes WHERE project=p.id)"
-        conditions.append(exists if reservation == "reserved" else "NOT " + exists)
+        conditions.append("p.dedicated=?")
+        params.append(reservation == "reserved")
     where = " WHERE " + " AND ".join(conditions)
     with database() as db:
         admin(db)
@@ -665,9 +862,10 @@ def project_list():
         pages = max(1, (total + size - 1) // size)
         page = min(page, pages)
         rows = db.execute("""
-            SELECT p.id,p.name,p.status,p.affiliation,p.contact,
+            SELECT p.id,p.name,p.status,p.affiliation,p.contact,p.dedicated,
                 (SELECT count(*) FROM project_nodes WHERE project=p.id) AS reserved,
-                (SELECT count(*) FROM jobs WHERE project=p.id) AS jobs
+                (SELECT count(*) FROM jobs WHERE project=p.id) +
+                (SELECT count(*) FROM pipeline_jobs WHERE project=p.id) AS jobs
             FROM projects p
         """ + where + f" ORDER BY {orders[sort]} LIMIT ? OFFSET ?", (*params, size, (page - 1) * size))
         return jsonify(projects=[dict(row) for row in rows], total=total, page=page, pages=pages, counts=counts)
@@ -683,6 +881,9 @@ def project_detail(project_id):
         expire(db, now)
         project_data["reserved_nodes"] = reservation_state(db, now, project_id)[project_id]
         project_data["policy"] = project_policy(db, project_id)
+        project_data["pipeline"] = {row["status"]: row["total"] for row in db.execute("""
+            SELECT status,count(*) AS total FROM pipeline_jobs WHERE project=? GROUP BY status
+        """, (project_id,))}
         project_data["tasks"] = {row["status"]: row["total"] for row in db.execute("""
             SELECT t.status,count(*) AS total FROM jobs j JOIN tasks t ON t.job=j.id
             WHERE j.project=? GROUP BY t.status
@@ -797,6 +998,37 @@ def state():
         return jsonify(overview)
 
 
+FLEET_STATES_SQL = """
+    WITH fleet AS (
+        SELECT n.id,n.name,n.seen,n.device,n.hardware,p.name AS project_name,
+            net.upload_limit_mbps,net.upload_mbps,net.download_mbps,net.rtt_ms,net.sampled_at,net.local_link,
+            coalesce(e.approved=0 AND n.revoked=0,0) AS awaiting_approval, CASE
+            WHEN n.revoked=1 THEN 'revoked'
+            WHEN n.enabled=0 THEN 'disabled'
+            WHEN EXISTS (
+                SELECT 1 FROM (
+                    SELECT expires FROM tasks WHERE node=n.id AND status='running'
+                    UNION ALL
+                    SELECT expires FROM pipeline_jobs WHERE node=n.id AND status='running'
+                ) AS assigned WHERE assigned.expires>?
+            ) THEN 'working'
+            WHEN n.seen IS NULL AND n.device IS NULL THEN 'new'
+            WHEN n.seen>=? AND n.paused=1 THEN 'paused'
+            WHEN n.seen>=? AND pn.project IS NOT NULL THEN 'reserved'
+            WHEN n.seen>=? THEN 'online'
+            ELSE 'offline'
+        END AS state FROM nodes n
+        LEFT JOIN project_nodes pn ON pn.node=n.id LEFT JOIN projects p ON p.id=pn.project
+        LEFT JOIN node_network net ON net.node=n.id
+        LEFT JOIN public_node_enrollments e ON e.node=n.id
+    )
+"""
+
+
+def fleet_times(now):
+    return (now, now - ONLINE_SECONDS, now - ONLINE_SECONDS, now - ONLINE_SECONDS)
+
+
 @app.get("/admin/fleet")
 def fleet():
     search = request.args.get("q", "").strip()
@@ -806,27 +1038,9 @@ def fleet():
     if len(search) > 160 or status not in ("", *NODE_STATES) or not 1 <= page <= 1_000_000 or size not in PAGE_SIZES:
         abort(400, description="Paramètres de recherche ou de pagination invalides.")
     now = time.time()
-    classified = """
-        WITH fleet AS (
-            SELECT n.id,n.name,n.seen,n.device,n.hardware,p.name AS project_name,
-                net.upload_limit_mbps,net.upload_mbps,net.download_mbps,net.rtt_ms,net.sampled_at,net.local_link, CASE
-                WHEN n.revoked=1 THEN 'revoked'
-                WHEN n.enabled=0 THEN 'disabled'
-                WHEN EXISTS (
-                    SELECT 1 FROM tasks WHERE node=n.id AND status='running' AND expires>?
-                ) THEN 'working'
-                WHEN n.seen IS NULL AND n.device IS NULL THEN 'new'
-                WHEN n.seen>=? AND n.paused=1 THEN 'paused'
-                WHEN n.seen>=? AND pn.project IS NOT NULL THEN 'reserved'
-                WHEN n.seen>=? THEN 'online'
-                ELSE 'offline'
-            END AS state FROM nodes n
-            LEFT JOIN project_nodes pn ON pn.node=n.id LEFT JOIN projects p ON p.id=pn.project
-            LEFT JOIN node_network net ON net.node=n.id
-        )
-    """
+    classified = FLEET_STATES_SQL
     matching = " WHERE (?='' OR state=?)"
-    params = [now, *([now - ONLINE_SECONDS] * 3), status, status]
+    params = [*fleet_times(now), status, status]
     with database() as db:
         role = admin(db)
         db.execute("BEGIN")
@@ -895,16 +1109,19 @@ def reserve_project(project_id):
         ).fetchone():
             abort(404, description="Projet approuvé introuvable.")
         previous_ids = {row["node"] for row in db.execute("SELECT node FROM project_nodes WHERE project=?", (project_id,))}
+        dedicated = db.execute("SELECT dedicated FROM projects WHERE id=?", (project_id,)).fetchone()[0]
         chosen = []
         if count:
             now = time.time()
             expire(db, now)
+            expire_pipeline(db, now)
             candidates = db.execute("""
                 SELECT n.id,n.name,n.device,n.hardware,pn.project FROM nodes n
                 LEFT JOIN project_nodes pn ON pn.node=n.id
                 WHERE n.enabled=1 AND n.paused=0 AND n.seen>=? AND n.capsule=?
                   AND (pn.project IS NULL OR pn.project=?)
                   AND NOT EXISTS (SELECT 1 FROM tasks WHERE node=n.id AND status='running')
+                  AND NOT EXISTS (SELECT 1 FROM pipeline_jobs WHERE node=n.id AND status='running')
                 ORDER BY (pn.project IS NOT NULL) DESC, n.id
             """, (now - ONLINE_SECONDS, CAPSULE, project_id)).fetchall()
             if ids is not None:
@@ -928,10 +1145,11 @@ def reserve_project(project_id):
                 chosen = [row for group in sorted_groups for row in group][:count]
                 chosen.extend(unknown[:count - len(chosen)])
         next_ids = {row["id"] for row in chosen}
-        if previous_ids != next_ids:
+        if previous_ids != next_ids or bool(dedicated) != bool(next_ids):
             db.execute("DELETE FROM project_nodes WHERE project=?", (project_id,))
             db.executemany("INSERT INTO project_nodes(node,project) VALUES (?,?)",
                            ((node_id, project_id) for node_id in sorted(next_ids)))
+            db.execute("UPDATE projects SET dedicated=? WHERE id=?", (bool(next_ids), project_id))
             record_history(db, "nodes_reserved" if count else "reservation_released",
                            nodes=previous_ids | next_ids, projects=(project_id,), quantity=count or len(previous_ids))
     profiles = {row["hardware"].casefold() for row in chosen if row["hardware"]}
@@ -1002,8 +1220,7 @@ def enroll_node():
     if not isinstance(identity, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", identity):
         abort(400, description="Identité de poste invalide.")
     secret = digest(identity)
-    with database() as db:
-        db.execute("BEGIN IMMEDIATE")
+    def invitation(db):
         invite = db.execute("SELECT id,expires,uses,max_uses,revoked FROM enrollment_invites WHERE secret=?",
                             (supplied,)).fetchone()
         if invite is None:
@@ -1016,9 +1233,19 @@ def enroll_node():
                 SELECT n.id FROM nodes n JOIN invite_nodes i ON i.node=n.id WHERE n.secret=? AND i.invite=?
             """, (secret, invite["id"])).fetchone()
             if registered is not None:
-                return jsonify(id=registered["id"])
+                return invite, registered["id"]
             if invite["revoked"] or invite["expires"] <= time.time() or invite["uses"] >= invite["max_uses"]:
                 abort(401, description="Invitation indisponible.")
+        return invite, None
+
+    with database() as db:
+        _, registered = invitation(db)
+        if registered is not None:
+            return jsonify(id=registered)
+        db.execute("BEGIN IMMEDIATE")
+        invite, registered = invitation(db)
+        if registered is not None:
+            return jsonify(id=registered)
         created = db.execute("INSERT INTO nodes(name,secret) VALUES (?,?) ON CONFLICT(secret) DO NOTHING", (name, secret))
         row = db.execute("SELECT id FROM nodes WHERE secret=?", (secret,)).fetchone()
         if created.rowcount:
@@ -1027,6 +1254,38 @@ def enroll_node():
                 db.execute("UPDATE enrollment_invites SET uses=uses+1 WHERE id=?", (invite["id"],))
             record_history(db, "node_enrolled", actor="agent", nodes=(row["id"],), quantity=1)
     return jsonify(id=row["id"])
+
+
+@app.post("/v1/node/contribute")
+def enroll_public_node():
+    if not PUBLIC_ENROLLMENT:
+        abort(404)
+    data = payload()
+    name = field(data, "name", 100)
+    identity = data.get("identity")
+    if not isinstance(identity, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", identity):
+        abort(400, description="Identité de poste invalide.")
+    secret = digest(identity)
+    with database() as db:
+        db.execute("BEGIN IMMEDIATE")
+        previous = db.execute("""
+            SELECT n.id,e.approved,n.revoked FROM nodes n
+            LEFT JOIN public_node_enrollments e ON e.node=n.id WHERE n.secret=?
+        """, (secret,)).fetchone()
+        if previous:
+            if previous["revoked"] or previous["approved"] is None:
+                abort(403)
+            return jsonify(id=previous["id"], pending=not previous["approved"])
+        pending = db.execute("""
+            SELECT count(*) FROM public_node_enrollments e JOIN nodes n ON n.id=e.node
+            WHERE e.approved=0 AND n.revoked=0
+        """).fetchone()[0]
+        if pending >= 1000:
+            abort(429, description="La file des inscriptions publiques est pleine.")
+        node_id = db.execute("INSERT INTO nodes(name,secret,enabled) VALUES (?,?,0)", (name, secret)).lastrowid
+        db.execute("INSERT INTO public_node_enrollments(node) VALUES (?)", (node_id,))
+        record_history(db, "node_enrolled", actor="agent", nodes=(node_id,), quantity=1)
+        return jsonify(id=node_id, pending=True), 201
 
 
 @app.post("/admin/nodes/<int:node_id>/<any(enable,disable):action>")
@@ -1088,12 +1347,21 @@ def change_nodes(db, ids, action):
         UNION
         SELECT j.project FROM tasks t JOIN jobs j ON j.id=t.job
         WHERE t.status='running' AND t.node IN ({placeholders})
-    """, (*changed, *changed))]
+        UNION
+        SELECT project FROM pipeline_jobs WHERE status='running' AND node IN ({placeholders})
+    """, (*changed, *changed, *changed))]
     db.execute(f"UPDATE nodes SET enabled=?, seen=NULL WHERE id IN ({placeholders})", (enabled, *changed))
+    if enabled:
+        db.execute(f"UPDATE public_node_enrollments SET approved=1 WHERE node IN ({placeholders})", changed)
     released = 0
     if not enabled:
         released = db.execute(f"""
             UPDATE tasks SET status='queued', node=NULL, lease=NULL, expires=NULL, attempts=attempts-1
+            WHERE node IN ({placeholders}) AND status='running'
+        """, changed).rowcount
+        released += db.execute(f"""
+            UPDATE pipeline_jobs SET status='queued',node=NULL,lease=NULL,expires=NULL,
+                                     attempts=max(0,attempts-1)
             WHERE node IN ({placeholders}) AND status='running'
         """, changed).rowcount
     record_history(db, action, nodes=changed, projects=projects, quantity=len(changed), released=released, created=now)
@@ -1105,9 +1373,7 @@ def batch_width(db, project_id, values, now):
         SELECT net.* FROM nodes n
         LEFT JOIN project_nodes pn ON pn.node=n.id LEFT JOIN node_network net ON net.node=n.id
         WHERE n.enabled=1 AND n.paused=0 AND n.seen>=? AND n.capsule=? AND (
-            pn.project=? OR (pn.project IS NULL AND NOT EXISTS (
-                SELECT 1 FROM project_nodes WHERE project=?
-            ))
+            pn.project=? OR (pn.project IS NULL AND (SELECT dedicated FROM projects WHERE id=?)=0)
         )
     """, (now - ONLINE_SECONDS, CAPSULE, project_id, project_id)).fetchall()
     if not profiles:
@@ -1132,6 +1398,7 @@ def submit_job():
     fingerprint = digest(json.dumps([CAPSULE, values], separators=(",", ":")))
     job_id = secrets.token_hex(16)
     with database() as db:
+        project(db, write=True)
         db.execute("BEGIN IMMEDIATE")
         project_id = project(db, write=True)
         if request_key is not None:
@@ -1158,6 +1425,7 @@ def submit_job():
 
 
 def check_admission(db, project_id, now):
+    expire_pipeline(db, now)
     policy = project_policy(db, project_id)
     if not policy["admissions"]:
         return jsonify(error="Le projet suspend l’admission de nouvelles demandes."), 409
@@ -1169,6 +1437,10 @@ def check_admission(db, project_id, now):
                 SELECT 1 FROM tasks t WHERE t.job=j.id AND t.status IN ('queued','running')
             )
         """, (project_id,)).fetchone()[0]
+        recent += db.execute("SELECT count(*) FROM pipeline_jobs WHERE project=? AND created>=?",
+                             (project_id, now - 60)).fetchone()[0]
+        active += db.execute("SELECT count(*) FROM pipeline_jobs WHERE project=? AND status IN ('queued','running')",
+                             (project_id,)).fetchone()[0]
         if recent >= policy["per_minute"] or active >= policy["max_active"]:
             return jsonify(error="Quota de calcul du projet atteint."), 429, {"Retry-After": "60"}
     return None
@@ -1214,6 +1486,7 @@ def get_job(job_id):
 @app.post("/v1/jobs/<job_id>/cancel")
 def cancel_job(job_id):
     with database() as db:
+        project(db, write=True)
         db.execute("BEGIN IMMEDIATE")
         project_id = project(db, write=True)
         if not db.execute("SELECT 1 FROM jobs WHERE id=? AND project=?", (job_id, project_id)).fetchone():
@@ -1327,7 +1600,7 @@ def operations_page():
 def operations_data():
     now = time.time()
     with database() as db:
-        admin(db)
+        role = admin(db)
         db.execute("BEGIN")
         oldest = db.execute("""
             SELECT min(j.created) FROM tasks t JOIN jobs j ON j.id=t.job WHERE t.status='queued'
@@ -1338,8 +1611,42 @@ def operations_data():
             FROM nodes WHERE enabled=1 AND seen>=? GROUP BY agent_version ORDER BY total DESC,version
         """, (now - ONLINE_SECONDS,))]
         late = db.execute("SELECT count(*) FROM tasks WHERE status='running' AND expires<=?", (now,)).fetchone()[0]
+        pipeline = {row[0]: row[1] for row in db.execute("SELECT status,count(*) FROM pipeline_jobs GROUP BY status")}
+        pipeline_late = db.execute("SELECT count(*) FROM pipeline_jobs WHERE status='running' AND expires<=?",
+                                   (now,)).fetchone()[0]
+        counts = {row["state"]: row["total"] for row in db.execute(
+            FLEET_STATES_SQL + "SELECT state,count(*) AS total FROM fleet GROUP BY state", fleet_times(now)
+        )}
+        roster = [dict(row) for row in db.execute(FLEET_STATES_SQL + """
+            SELECT id,name,device,state,project_name FROM fleet
+            ORDER BY CASE state WHEN 'working' THEN 0 WHEN 'online' THEN 1 WHEN 'reserved' THEN 2
+                                WHEN 'paused' THEN 3 ELSE 4 END, seen DESC,id DESC LIMIT 24
+        """, fleet_times(now))]
+        active = [dict(row) for row in db.execute("""
+            SELECT t.job,t.position,t.attempts,t.expires,n.name AS node_name,p.name AS project_name,
+                   p.id AS project_id,n.id AS node_id,'v1' AS kind,0 AS verifying
+            FROM tasks t JOIN jobs j ON t.job=j.id JOIN projects p ON p.id=j.project JOIN nodes n ON n.id=t.node
+            WHERE t.status='running' AND t.expires>?
+            UNION ALL
+            SELECT j.id,j.stage,j.attempts,j.expires,n.name,p.name,p.id,n.id,'v2',j.verification_node IS NOT NULL
+            FROM pipeline_jobs j JOIN projects p ON p.id=j.project JOIN nodes n ON n.id=j.node
+            WHERE j.status='running' AND j.expires>?
+            ORDER BY expires,job,position LIMIT 12
+        """, (now, now))]
+        events = [dict(row) for row in db.execute("""
+            SELECT id,created,action,actor,actor_name,quantity,released FROM history_events ORDER BY id DESC LIMIT 6
+        """)]
+        current_minute = int(now // 60)
+        first = current_minute - 29
+        counts_by_minute = dict(db.execute("SELECT minute,completed FROM completion_minutes WHERE minute BETWEEN ? AND ?",
+                                          (first, current_minute)).fetchall())
+        first_sample = db.execute("SELECT value FROM settings WHERE name='completion_tracking'").fetchone()
+        start = max(first, int(first_sample[0]) // 60) if first_sample else current_minute
+        trend = [{"at": minute * 60, "completed": counts_by_minute.get(minute, 0)}
+                 for minute in range(start, current_minute + 1)]
     return jsonify(mode=MODE, tasks=tasks, oldest_seconds=None if oldest is None else int(max(0, now-oldest)),
-                   expired_leases=late, versions=versions, capsule=CAPSULE, verification="fp16" if PILOT else "format")
+                   expired_leases=late, pipeline=pipeline, pipeline_expired_leases=pipeline_late, versions=versions, capsule=CAPSULE, verification="fp16" if PILOT else "format",
+                   now=now, counts=counts, roster=roster, active=active, events=events, trend=trend, role=role)
 
 
 @app.route("/v1/node/network-probe", methods=["HEAD", "GET", "POST"])
@@ -1347,18 +1654,18 @@ def network_probe():
     if request.method == "POST" and request.content_length != PROBE_BYTES:
         abort(400, description="Taille de sonde invalide.")
     with database() as db:
-        if request.method != "HEAD":
-            db.execute("BEGIN IMMEDIATE")
         node_id = node(db)
         if request.method == "HEAD":
             return "", 204
+        if request.method == "POST" and len(request.get_data(cache=False)) != PROBE_BYTES:
+            abort(400, description="Sonde incomplète.")
+        db.execute("BEGIN IMMEDIATE")
+        node_id = node(db)
         column = "last_upload_probe" if request.method == "POST" else "last_download_probe"
         info = db.execute(f"SELECT {column} FROM node_network WHERE node=?", (node_id,)).fetchone()
         now = time.time()
         if info and info[0] is not None and now - info[0] < PROBE_INTERVAL:
             return jsonify(error="Mesure récente."), 429, {"Retry-After": str(PROBE_INTERVAL)}
-        if request.method == "POST" and len(request.get_data(cache=False)) != PROBE_BYTES:
-            abort(400, description="Sonde incomplète.")
         db.execute(f"""
             INSERT INTO node_network(node,{column}) VALUES (?,?)
             ON CONFLICT(node) DO UPDATE SET {column}=excluded.{column}
@@ -1407,6 +1714,7 @@ def claim():
     if type(paused) is not bool:
         abort(400, description="État du partage invalide.")
     with database() as db:
+        node(db)
         db.execute("BEGIN IMMEDIATE")
         node_id = node(db)
         now = time.time()
@@ -1415,7 +1723,7 @@ def claim():
         if "network" in data:
             update_network(db, node_id, now, data["network"])
         expire(db, now)
-        if paused or not supported or db.execute(
+        if paused or not supported or pipeline_busy(db, node_id, now) or db.execute(
             "SELECT 1 FROM tasks WHERE node=? AND status='running'", (node_id,)
         ).fetchone():
             return jsonify(task=None)
@@ -1427,11 +1735,10 @@ def claim():
         ), deterministic=True)
         task = db.execute("""
             SELECT t.job,t.position,t.input FROM tasks t JOIN jobs j ON t.job=j.id
+            JOIN projects project_rules ON project_rules.id=j.project
             LEFT JOIN project_policy p ON p.project=j.project
             WHERE t.status='queued' AND (
-                j.project=? OR (? IS NULL AND NOT EXISTS (
-                    SELECT 1 FROM project_nodes WHERE project=j.project
-                ))
+                j.project=? OR (? IS NULL AND project_rules.dedicated=0)
             ) AND fits_network_budget(length(t.input), json_array_length(t.input))
             ORDER BY j.created - 300 * coalesce(p.priority,0),j.created,t.position LIMIT 1
         """, (project_id, project_id)).fetchone()
@@ -1455,6 +1762,7 @@ def result():
     if type(position) is not int or not 0 <= position < MAX_VALUES:
         abort(400)
     with database() as db:
+        node(db)
         db.execute("BEGIN IMMEDIATE")
         node_id = node(db)
         task = db.execute("""
@@ -1483,6 +1791,12 @@ def result():
             return jsonify(error="Résultat divergent de la référence FP16."), 409
         db.execute("UPDATE tasks SET status='done',output=?,expires=NULL WHERE job=? AND position=?",
                    (json.dumps(values), job, position))
+        minute = int(time.time() // 60)
+        db.execute("""
+            INSERT INTO completion_minutes VALUES (?,1)
+            ON CONFLICT(minute) DO UPDATE SET completed=completed+1
+        """, (minute,))
+        db.execute("DELETE FROM completion_minutes WHERE minute<?", (minute - 24 * 60,))
     return jsonify(status="done")
 
 
@@ -1490,7 +1804,24 @@ def fp16(value):
     return struct.unpack("<e", struct.pack("<e", value))[0]
 
 
+def reconcile_pipeline(stop):
+    while not stop.wait(15):
+        try:
+            with database() as db:
+                expire_pipeline(db, time.time())
+        except sqlite3.Error:
+            app.logger.exception("Échec de la réconciliation des baux v2.")
+
+
+install_routes(app, lambda: RUNTIME, database, admin, project, node, payload, check_admission)
+
+
 if __name__ == "__main__":
     initialize()
-    serve(app, host=os.environ.get("OPEN_NPU_BIND", "127.0.0.1") if PILOT else "127.0.0.1",
-          port=int(os.environ.get("OPEN_NPU_PORT", "8787")), max_request_body_size=app.config["MAX_CONTENT_LENGTH"])
+    stop = Event()
+    Thread(target=reconcile_pipeline, args=(stop,), daemon=True).start()
+    try:
+        serve(app, host=os.environ.get("OPEN_NPU_BIND", "127.0.0.1") if PILOT else "127.0.0.1",
+              port=int(os.environ.get("OPEN_NPU_PORT", "8787")), max_request_body_size=MAX_TENSOR)
+    finally:
+        stop.set()

@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="/assets/i18n.css">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Accès · OPEN-NPU</title>
+  <title data-i18n="28fd8050e77a">Accès · OPEN-NPU</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/admin.css">
   <link rel="stylesheet" href="/assets/control.css">
@@ -12,55 +13,61 @@
 <body class="console">
   <header class="console-header">
     <a class="brand" href="/"><i aria-hidden="true"></i>OPEN-NPU</a>
-    <nav aria-label="Administration"><a href="/admin">Flotte</a><a href="/admin/projects">Projets</a><a href="/admin/jobs">Calculs</a><a href="/admin/access" aria-current="page">Accès</a><a href="/admin/operations">Supervision</a><a href="/admin/history">Historique</a></nav>
-    <a class="site-link" href="/">Voir le site ↗</a>
+    <nav aria-label="Administration" data-i18n-aria-label="4b42c6690ebe"><a href="/admin" data-i18n="b52ec4de1fa5">Flotte</a><a href="/admin/projects" data-i18n="0dad61b6318a">Projets</a><a href="/admin/jobs" data-i18n="eb40fb4feed8">Calculs</a><a href="/admin/capsules" data-i18n="7b21f889c2f6">Capsules</a><a href="/admin/access" aria-current="page" data-i18n="ad64b73f553b">Accès</a><a href="/admin/operations" data-i18n="70b7011b3ce0">Supervision</a><a href="/admin/history" data-i18n="865df3324ad9">Historique</a></nav>
+    <a class="site-link" href="/" data-i18n="ebc295320b67">Voir le site ↗</a>
+    <span class="language-picker" data-language-picker><select aria-label="Langue"><option value="fr">Français</option></select></span>
   </header>
   <main id="admin" data-control="access">
-    <div class="console-heading"><div><p class="section-label">Administration</p><h1>Accès</h1></div><button type="button" id="refresh-control" class="secondary">Actualiser</button></div>
+    <div class="console-heading"><div><p class="section-label" data-i18n="4b42c6690ebe">Administration</p><h1 data-i18n="ad64b73f553b">Accès</h1></div><button type="button" id="refresh-control" class="secondary" data-i18n="d7d646faaecb">Actualiser</button></div>
     <p id="control-notice" role="status"></p>
     <div class="control-grid">
       <section class="panel" aria-labelledby="invite-title">
-        <h2 id="invite-title">Invitations de postes</h2>
+        <h2 id="invite-title" data-i18n="1ebc82497ad0">Invitations de postes</h2>
         <form id="invite-form" class="control-form">
-          <label>Libellé <input name="label" maxlength="100" required></label>
-          <label>Validité en heures <input name="hours" type="number" min="1" max="168" value="24" required></label>
-          <label>Nombre de postes <input name="max_uses" type="number" min="1" max="100" value="5" required></label>
-          <button>Créer l’invitation</button>
+          <label data-i18n="370719ce841b">Libellé <input name="label" maxlength="100" required></label>
+          <label data-i18n="f79bd55e6d2d">Validité en heures <input name="hours" type="number" min="1" max="168" value="24" required></label>
+          <label data-i18n="9d64b31b42e9">Nombre de postes <input name="max_uses" type="number" min="1" max="100" value="5" required></label>
+          <button data-i18n="27c743ceaecd">Créer l’invitation</button>
         </form>
-        <div class="table-scroll" tabindex="0" aria-label="Invitations">
-          <table><thead><tr><th>Invitation</th><th>Expire le</th><th>Utilisations</th><th>État</th><th>Action</th></tr></thead><tbody id="invite-rows"></tbody></table>
+        <div class="table-scroll" tabindex="0" aria-label="Invitations" data-i18n-aria-label="14210e691c87">
+          <table><thead><tr><th data-i18n="af4ea02852eb">Invitation</th><th data-i18n="a0e2b951dde2">Expire le</th><th data-i18n="d3c6b10804bd">Utilisations</th><th data-i18n="de4dd03297a1">État</th><th data-i18n="64cff1319d2f">Action</th></tr></thead><tbody id="invite-rows"></tbody></table>
         </div>
       </section>
       <section class="panel" id="keys-panel" aria-labelledby="keys-title">
-        <h2 id="keys-title">Clés API par projet</h2>
-        <form id="lookup-form" class="control-form"><label>Identifiant du projet <input name="project" type="number" min="1" required></label><button class="secondary">Afficher les clés</button></form>
-        <form id="key-form" class="control-form" hidden>
-          <label>Nom de la clé <input name="label" maxlength="100" required></label>
-          <label>Droits <select name="scope"><option value="read">Lecture</option><option value="write">Lecture et écriture</option></select></label>
-          <label>Validité en jours <input name="days" type="number" min="1" max="365" value="30" required></label>
-          <button>Créer la clé</button>
+        <h2 id="keys-title" data-i18n="28b24dac6a46">Clés API par projet</h2>
+        <form id="lookup-form" class="control-form">
+          <div><label for="project-search" data-i18n="4279d3eabdb4">Rechercher un projet approuvé</label><input id="project-search" name="search" type="search" maxlength="160" placeholder="Nom ou établissement" data-i18n-placeholder="85bfb70ddebd"></div>
+          <div><label for="project-choice" data-i18n="63907bbe60a8">Projet approuvé</label><select id="project-choice" name="project" required><option value="" data-i18n="66474911d953">Chargement…</option></select></div>
+          <button class="secondary" data-i18n="eeb5a76f2505">Afficher les clés</button>
         </form>
-        <div id="key-table" class="table-scroll" tabindex="0" aria-label="Clés du projet" hidden>
-          <table><thead><tr><th>Clé</th><th>Droits</th><th>Expire le</th><th>État</th><th>Action</th></tr></thead><tbody id="key-rows"></tbody></table>
+        <p id="project-lookup-note" class="muted" role="status"></p>
+        <form id="key-form" class="control-form" hidden>
+          <label data-i18n="c934314f0024">Nom de la clé <input name="label" maxlength="100" required></label>
+          <label>Droits <select name="scope"><option value="read" data-i18n="a757c6b4039f">Lecture</option><option value="write" data-i18n="8e8dbe3f35d0">Lecture et écriture</option></select></label>
+          <label data-i18n="97bba9d7de81">Validité en jours <input name="days" type="number" min="1" max="365" value="30" required></label>
+          <button data-i18n="8f50d2959ead">Créer la clé</button>
+        </form>
+        <div id="key-table" class="table-scroll" tabindex="0" aria-label="Clés du projet" hidden data-i18n-aria-label="9e5b6f6e9070">
+          <table><thead><tr><th data-i18n="51dcb443ce80">Clé</th><th data-i18n="cb3ecbebc7ab">Droits</th><th data-i18n="a0e2b951dde2">Expire le</th><th data-i18n="de4dd03297a1">État</th><th data-i18n="64cff1319d2f">Action</th></tr></thead><tbody id="key-rows"></tbody></table>
         </div>
       </section>
       <section class="panel" aria-labelledby="account-title">
-        <h2 id="account-title">Comptes d’administration</h2>
+        <h2 id="account-title" data-i18n="bc30129a5d3f">Comptes d’administration</h2>
         <p id="account-info"></p>
-        <div class="toolbar"><a class="project-directory-link" href="/login">Changer de compte ↗</a><button id="logout" class="secondary" type="button" hidden>Se déconnecter</button></div>
+        <div class="toolbar"><a class="project-directory-link" href="/login" data-i18n="b8425f161ec2">Changer de compte ↗</a><button id="logout" class="secondary" type="button" hidden data-i18n="b18aeed1a806">Se déconnecter</button></div>
         <form id="account-form" class="control-form" hidden>
-          <label>Identifiant <input name="name" minlength="3" maxlength="48" pattern="[a-zA-Z0-9_.\-]+" required></label>
-          <label>Rôle <select name="role"><option value="reader">Lecture seule</option><option value="operator">Opérateur</option><option value="owner">Propriétaire</option></select></label>
-          <label><input name="mfa" type="checkbox" checked> Activer le code à usage unique</label>
-          <button>Créer le compte</button>
+          <label data-i18n="b6b0b3ee7634">Identifiant <input name="name" minlength="3" maxlength="48" pattern="[a-zA-Z0-9_.\-]+" required></label>
+          <label>Rôle <select name="role"><option value="reader" data-i18n="2af697456ab2">Lecture seule</option><option value="operator" data-i18n="16602c56b3e8">Opérateur</option><option value="owner" data-i18n="b406881e070b">Propriétaire</option></select></label>
+          <label data-i18n="e04ff5831cb6"><input name="mfa" type="checkbox" checked> Activer le code à usage unique</label>
+          <button data-i18n="a0c6ca6813e8">Créer le compte</button>
         </form>
-        <div id="accounts-table" class="table-scroll" tabindex="0" aria-label="Comptes nominatifs" hidden>
-          <table><thead><tr><th>Identifiant</th><th>Rôle</th><th>Code à usage unique</th><th>État</th><th>Action</th></tr></thead><tbody id="account-rows"></tbody></table>
+        <div id="accounts-table" class="table-scroll" tabindex="0" aria-label="Comptes nominatifs" hidden data-i18n-aria-label="da9d52dbc4ff">
+          <table><thead><tr><th data-i18n="f9e7d49e4745">Identifiant</th><th data-i18n="a1fc967c5587">Rôle</th><th data-i18n="c9a0acb3caea">Code à usage unique</th><th data-i18n="de4dd03297a1">État</th><th data-i18n="64cff1319d2f">Action</th></tr></thead><tbody id="account-rows"></tbody></table>
         </div>
       </section>
     </div>
   </main>
-  <dialog id="action-dialog"><h2 id="action-title">Confirmer l’action</h2><p id="action-text"></p><form method="dialog" class="dialog-actions"><button value="cancel" class="secondary">Annuler</button><button value="confirm">Confirmer</button></form></dialog>
-  <dialog id="credential-dialog"><h2 id="credential-title">Identifiant d’accès</h2><label for="credential-value">Valeur affichée une seule fois</label><textarea id="credential-value" rows="4" readonly></textarea><form method="dialog" class="dialog-actions"><button>Fermer</button></form></dialog>
+  <dialog id="action-dialog"><h2 id="action-title" data-i18n="d5df954e0ef1">Confirmer l’action</h2><p id="action-text"></p><form method="dialog" class="dialog-actions"><button value="cancel" class="secondary" data-i18n="46ad3916f6a0">Annuler</button><button value="confirm" data-i18n="30a8b7846961">Confirmer</button></form></dialog>
+  <dialog id="credential-dialog"><h2 id="credential-title" data-i18n="a19addc2cb43">Identifiant d’accès</h2><label for="credential-value" data-i18n="1831d3bfa378">Valeur affichée une seule fois</label><textarea id="credential-value" rows="4" readonly></textarea><form method="dialog" class="dialog-actions"><button data-i18n="711e5f2e198d">Fermer</button></form></dialog>
 </body>
 </html>

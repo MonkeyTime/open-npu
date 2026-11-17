@@ -1,5 +1,8 @@
 $ErrorActionPreference = 'Stop'
-$agent = Join-Path $PSScriptRoot 'dist/OpenNpuAgent/OpenNpuAgent.exe'
+$agent = Join-Path $PSScriptRoot 'runtime/agent/OpenNpuAgent.exe'
+if (!(Test-Path -LiteralPath $agent)) {
+    $agent = Join-Path $PSScriptRoot 'dist/OpenNpuAgent/OpenNpuAgent.exe'
+}
 $config = Join-Path $PSScriptRoot 'runtime/node.json'
 if (!(Test-Path -LiteralPath $config)) {
     $keyFile = Join-Path $PSScriptRoot 'runtime/enrollment.key'

@@ -1,13 +1,41 @@
-{$OPEN_NPU_DOMAIN} {
-    @admin_external {
-        path /admin /admin/*
-        not remote_ip {$OPEN_NPU_ADMIN_CIDR}
-    }
-    respond @admin_external 403
+{
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 5m
+			idle 1m
+		}
+	}
+}
 
-    header {
-        Strict-Transport-Security "max-age=31536000"
-        -Server
-    }
-    reverse_proxy open-npu:8787
+{$OPEN_NPU_DOMAIN} {
+	@admin_external {
+		path /admin /admin/*
+		not remote_ip {$OPEN_NPU_ADMIN_CIDR}
+	}
+	respond @admin_external 403
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	@tensor {
+		method POST
+		path /v2/node/stages/*/result
+	}
+	@standard {
+		not {
+			method POST
+			path /v2/node/stages/*/result
+		}
+	}
+	request_body @tensor {
+		max_size 8388608
+	}
+	request_body @standard {
+		max_size 98304
+	}
+	reverse_proxy open-npu:8787 {
+		header_up X-Open-NPU-Client {remote_host}
+	}
 }

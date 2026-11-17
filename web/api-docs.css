@@ -1,0 +1,23 @@
+.api-docs { max-width: 930px; margin-top: clamp(2rem, 6vw, 4.5rem); }
+.api-intro h1 { font-size: clamp(3rem, 8vw, 5.6rem); }
+.api-docs .section { padding-block: clamp(1.7rem, 4vw, 2.7rem); }
+.api-docs h2 { font-size: clamp(2rem, 5vw, 3rem); }
+.api-instance { display: flex; gap: .9rem 2.5rem; flex-wrap: wrap; padding: 1rem 1.2rem; background: #e6eee4; border: 1px solid var(--rule); border-radius: .55rem; }
+.api-instance dt { font-size: .84rem; color: var(--soft); }
+.api-instance dd { margin: .35rem 0 0; font-size: 1.07rem; overflow-wrap: anywhere; }
+.api-docs a { color: #245943; text-decoration: underline; text-underline-offset: .15em; }
+.api-toc { display: flex; flex-wrap: wrap; gap: .65rem 1.2rem; margin: 1.4rem 0; font-size: .92rem; }
+.api-docs code { font: .94em "IBM Plex Mono", Consolas, monospace; }
+.api-docs p code, .api-errors code { background: #e6eee4; padding: .08rem .24rem; border-radius: .2rem; overflow-wrap: anywhere; }
+.api-table { overflow-x: auto; margin-bottom: 1rem; }
+.api-table table { border-collapse: collapse; width: 100%; text-align: left; }
+.api-table th, .api-table td { border-bottom: 1px solid var(--rule); padding: .68rem .55rem; }
+.api-table td:nth-child(2) { min-width: 13rem; overflow-wrap: anywhere; }
+.api-docs .method { display: inline-block; color: #0d4333; background: #d5ebdb; padding: .2rem .34rem; border-radius: .25rem; }
+.api-docs .get { color: #224a68; background: #dcebf1; }
+.api-docs details { border: 1px solid var(--rule); border-radius: .45rem; margin-bottom: .85rem; }
+.api-docs summary { cursor: pointer; padding: .7rem .85rem; font-weight: 650; }
+.api-docs pre { margin: .75rem 0; padding: .9rem; color: #e9f5ef; background: #182e2a; overflow-x: auto; border-radius: .4rem; line-height: 1.5; }
+.api-docs details pre { margin: 0 .55rem .55rem; }
+.api-errors > div { display: grid; grid-template-columns: minmax(5.5rem, 7.5rem) minmax(0, 1fr); gap: .55rem; border-bottom: 1px solid var(--rule); padding: .6rem 0; }
+.api-errors dd { font-size: .95rem; margin: 0; }

@@ -1,10 +1,11 @@
+import { t, language } from "./i18n.js";
 import {api, element, transferSelection} from "./portal.js";
 
 const find = (id) => document.getElementById(id);
-const labels = {working: "En calcul", online: "Disponible", reserved: "Réservé", paused: "En pause", offline: "Hors ligne",
-                new: "Jamais connecté", disabled: "Désactivé", revoked: "Révoqué"};
-const date = new Intl.DateTimeFormat("fr-FR", {dateStyle: "short", timeStyle: "medium"});
-const number = new Intl.NumberFormat("fr-FR", {maximumFractionDigits: 3});
+const labels = {working: t("En calcul"), online: t("Disponible"), reserved: t("Réservé"), paused: t("En pause"), offline: t("Hors ligne"),
+                new: t("Jamais connecté"), disabled: t("Désactivé"), revoked: t("Révoqué")};
+const date = new Intl.DateTimeFormat(language, {dateStyle: "short", timeStyle: "medium"});
+const number = new Intl.NumberFormat(language, {maximumFractionDigits: 3});
 const selected = new Set();
 const limit = 100;
 const nodes = find("nodes");
@@ -37,7 +38,7 @@ function button(label, onClick, className = "secondary") {
 }
 
 const summaryCards = new Map();
-for (const [key, label] of Object.entries({"": "Tous les nœuds", ...labels})) {
+for (const [key, label] of Object.entries({"": t("Tous les nœuds"), ...labels})) {
   const count = element("strong", "—");
   const card = button(label, () => {
     state.value = key;
@@ -69,13 +70,13 @@ function updateSelection() {
   find("clear-selection").hidden = selected.size === 0;
   find("clear-selection").disabled = busy;
   find("selection-count").textContent = selected.size
-    ? `${selected.size} nœud${selected.size === 1 ? "" : "s"} sélectionné${selected.size === 1 ? "" : "s"}, dont ${checked} sur cette page`
-    : "Aucun nœud sélectionné";
+    ? t("Nœuds sélectionnés : {0} · Sur cette page : {1}", selected.size, checked)
+    : t("Aucun nœud sélectionné");
 }
 
 function selectNodes(ids, include) {
   if (include && new Set([...selected, ...ids]).size > limit) {
-    notice("fleet-notice", `Sélection limitée à ${limit} nœuds par action.`, true);
+    notice("fleet-notice", t("Sélection limitée à {0} nœuds par action.", limit), true);
   } else {
     for (const id of ids) {
       if (include) selected.add(id);
@@ -90,20 +91,20 @@ function networkCell(node, data) {
   const cell = element("td", "", "node-network");
   const rate = (value) => value === null ? "—" : `${number.format(value)} Mbit/s`;
   if (node.sampled_at === null) {
-    cell.append(element("span", "Aucune mesure"));
+    cell.append(element("span", t("Aucune mesure")));
   } else {
     const age = Math.max(0, data.now - node.sampled_at);
-    const ageText = age < 60 ? "moins d’une minute" : `${Math.floor(age / 60)} min`;
+    const ageText = age < 60 ? t("moins d’une minute") : `${Math.floor(age / 60)} min`;
     if (node.local_link) {
-      cell.append(element("span", "Connexion locale"));
+      cell.append(element("span", t("Connexion locale")));
     } else {
       cell.append(element("span", `↑ ${rate(node.upload_mbps)} · ↓ ${rate(node.download_mbps)}`));
     }
-    if (node.rtt_ms !== null) cell.append(element("small", `Latence serveur : ${number.format(node.rtt_ms)} ms`));
-    cell.append(element("small", `Mesurée il y a ${ageText}${age > data.sample_valid_seconds ? " · expirée" : ""}`));
+    if (node.rtt_ms !== null) cell.append(element("small", t("Latence serveur : {0} ms", number.format(node.rtt_ms))));
+    cell.append(element("small", t("Mesurée il y a {0}{1}", ageText, age > data.sample_valid_seconds ? t(" · expirée") : "")));
   }
-  cell.append(element("small", node.upload_limit_mbps === null ? "Aucun plafond déclaré" :
-    `Plafond d’envoi : ${rate(node.upload_limit_mbps)}`));
+  cell.append(element("small", node.upload_limit_mbps === null ? t("Aucun plafond déclaré") :
+    t("Plafond d’envoi : {0}", rate(node.upload_limit_mbps))));
   return cell;
 }
 
@@ -114,25 +115,26 @@ function nodeRow(node, data) {
   checkbox.type = "checkbox";
   checkbox.id = `select-node-${node.id}`;
   checkbox.dataset.node = node.id;
-  checkbox.setAttribute("aria-label", `Sélectionner ${node.name} (nœud ${node.id})`);
+  checkbox.setAttribute("aria-label", t("Sélectionner {0} (nœud {1})", node.name, node.id));
   checkbox.addEventListener("change", () => selectNodes([node.id], checkbox.checked));
   selection.append(checkbox);
 
   const name = document.createElement("td");
   name.append(element("strong", node.name), element("small", `#${node.id}`));
-  if (node.project_name) name.append(element("small", `Projet · ${node.project_name}`));
+  if (node.project_name) name.append(element("small", t("Projet · {0}", node.project_name)));
   const status = document.createElement("td");
-  status.append(element("span", labels[node.state], `node-status ${node.state}`));
+  status.append(element("span", node.awaiting_approval ? t("En attente de validation") : labels[node.state],
+    `node-status ${node.state}`));
   const actionCell = document.createElement("td");
   const action = node.state === "disabled" ? "enable" : "disable";
-  const actionButton = button(action === "enable" ? "Réactiver" : "Désactiver",
+  const actionButton = button(action === "enable" ? t("Réactiver") : t("Désactiver"),
     () => confirmAction(action, [node.id], node.name));
   actionButton.id = `action-node-${node.id}`;
-  actionButton.setAttribute("aria-label", `${actionButton.textContent} ${node.name} (nœud ${node.id})`);
+  actionButton.setAttribute("aria-label", t("{0} {1} (nœud {2})", actionButton.textContent, node.name, node.id));
   actionCell.append(actionButton);
   if (node.state === "revoked" || data.role === "reader") actionCell.replaceChildren();
   if (node.state !== "revoked" && data.role === "owner") {
-    actionCell.append(button("Révoquer", () => confirmAction("revoke", [node.id], node.name), "danger"));
+    actionCell.append(button(t("Révoquer"), () => confirmAction("revoke", [node.id], node.name), "danger"));
   }
   row.append(selection, name, status, element("td", node.hardware || node.device || "—"), networkCell(node, data),
     element("td", formatSeen(node.seen)), actionCell);
@@ -153,7 +155,7 @@ function renderFleet(data, filter) {
     const rows = data.nodes.map((node) => nodeRow(node, data));
     if (rows.length === 0) {
       const row = document.createElement("tr");
-      const cell = element("td", "Aucun nœud ne correspond à ces filtres.");
+      const cell = element("td", t("Aucun nœud ne correspond à ces filtres."));
       cell.colSpan = 7;
       row.append(cell);
       rows.push(row);
@@ -167,21 +169,21 @@ function renderFleet(data, filter) {
   } else {
     updateSelection();
   }
-  find("node-total").textContent = `${data.total} nœud${data.total === 1 ? "" : "s"}`;
-  find("page-info").textContent = `Page ${data.page} sur ${data.pages}`;
+  find("node-total").textContent = t("Nœuds : {0}", data.total);
+  find("page-info").textContent = t("Page {0} sur {1}", data.page, data.pages);
   find("previous").disabled = data.page <= 1;
   find("next").disabled = data.page >= data.pages;
   if (!previous || JSON.stringify(data.events) !== JSON.stringify(previous.events)) {
     const events = data.events.map((event) => {
-      const action = event.action === "enable" ? "Réactivation" : "Désactivation";
+      const action = event.action === "enable" ? t("Réactivation") : t("Désactivation");
       const count = event.node_ids.length;
-      const item = element("li", `${action} · ${count} nœud${count === 1 ? "" : "s"}`);
+      const item = element("li", t("{0} · Nœuds : {1}", action, count));
       const ids = event.node_ids.map((id) => `#${id}`).join(", ");
       item.append(element("small", `${formatSeen(event.created)} · ${ids}`));
-      if (event.released) item.append(element("small", `Lots remis en file : ${event.released}`));
+      if (event.released) item.append(element("small", t("Lots remis en file : {0}", event.released)));
       return item;
     });
-    find("events").replaceChildren(...(events.length ? events : [element("li", "Aucune action enregistrée.", "muted")]));
+    find("events").replaceChildren(...(events.length ? events : [element("li", t("Aucune action enregistrée."), "muted")]));
   }
 }
 
@@ -193,12 +195,12 @@ async function loadFleet(manual = false) {
     const data = await api(`/admin/fleet?${params}`);
     if (revision !== fleetRequest) return;
     renderFleet(data, filter);
-    notice("connection-status", manual ? "Flotte actualisée." : "Flotte synchronisée · actualisation automatique");
+    notice("connection-status", manual ? t("Flotte actualisée.") : t("Flotte synchronisée · actualisation automatique"));
   } catch (error) {
     if (revision !== fleetRequest) return;
     notice("connection-status", fleetData
-      ? `Actualisation impossible. Les dernières données restent affichées. ${error.message}`
-      : `Flotte indisponible. ${error.message}`, true);
+      ? t("Actualisation impossible. Les dernières données restent affichées. {0}", error.message)
+      : t("Flotte indisponible. {0}", error.message), true);
   }
 }
 
@@ -225,7 +227,7 @@ find("transfer-project").addEventListener("click", () => {
     transferSelection([...selected]);
     location.assign("/admin/projects?status=approved");
   } catch {
-    notice("fleet-notice", "Impossible de transférer la sélection dans ce navigateur.", true);
+    notice("fleet-notice", t("Impossible de transférer la sélection dans ce navigateur."), true);
   }
 });
 find("clear-selection").addEventListener("click", () => selectNodes([...selected], false));
@@ -244,13 +246,13 @@ function confirmAction(action, ids, name) {
   pendingAction = {action, node_ids: ids};
   const disabling = action === "disable";
   const revoking = action === "revoke";
-  const verb = revoking ? "Révoquer" : disabling ? "Désactiver" : "Réactiver";
-  find("confirm-title").textContent = name ? `${verb} ${name}` : `${verb} la sélection`;
+  const verb = revoking ? t("Révoquer") : disabling ? t("Désactiver") : t("Réactiver");
+  find("confirm-title").textContent = name ? `${verb} ${name}` : t("{0} la sélection", verb);
   find("confirm-detail").textContent = revoking
-    ? "L’identité du poste sera invalidée. Une nouvelle inscription sera nécessaire."
+    ? t("L’identité du poste sera invalidée. Une nouvelle inscription sera nécessaire.")
     : disabling
-    ? `${ids.length} nœud(s). Les lots en cours seront remis dans la file pour être repris.`
-    : `${ids.length} nœud(s). Les agents restés ouverts reprendront à leur prochaine connexion.`;
+    ? t("{0} nœud(s). Les lots en cours seront remis dans la file pour être repris.", ids.length)
+    : t("{0} nœud(s). Les agents restés ouverts reprendront à leur prochaine connexion.", ids.length);
   find("confirm-button").textContent = verb;
   find("confirm-button").classList.toggle("danger", disabling || revoking);
   notice("confirm-notice", "");
@@ -272,9 +274,9 @@ find("confirm-button").addEventListener("click", async () => {
       : await api("/admin/fleet/actions", pendingAction);
     for (const id of pendingAction.node_ids) selected.delete(id);
     confirmDialog.close();
-    const message = revoking ? `Nœud révoqué. Lots remis en file : ${result.released}.` : result.changed
-      ? `Nœuds modifiés : ${result.changed}. Lots remis en file : ${result.released}.`
-      : "Les nœuds sélectionnés étaient déjà dans cet état.";
+    const message = revoking ? t("Nœud révoqué. Lots remis en file : {0}.", result.released) : result.changed
+      ? t("Nœuds modifiés : {0}. Lots remis en file : {1}.", result.changed, result.released)
+      : t("Les nœuds sélectionnés étaient déjà dans cet état.");
     notice("fleet-notice", message);
     await Promise.all([loadFleet(), loadOverview()]);
   } catch (error) {
@@ -292,7 +294,7 @@ async function loadOverview() {
   try {
     const data = await api("/admin/state?include_nodes=0&include_projects=0");
     if (revision !== overviewRequest) return;
-    const counters = {queued: "En attente", running: "En cours", done: "Terminés", failed: "En échec", cancelled: "Annulés"};
+    const counters = {queued: t("En attente"), running: t("En cours"), done: t("Terminés"), failed: t("En échec"), cancelled: t("Annulés")};
     find("metrics").replaceChildren(...Object.entries(counters).map(([key, label]) => {
       const item = document.createElement("div");
       item.append(element("dt", label), element("dd", data.tasks[key] ?? 0));
@@ -300,7 +302,7 @@ async function loadOverview() {
     }));
     notice("queue-notice", "");
   } catch (error) {
-    if (revision === overviewRequest) notice("queue-notice", `Actualisation impossible. ${error.message}`, true);
+    if (revision === overviewRequest) notice("queue-notice", t("Actualisation impossible. {0}", error.message), true);
   }
 }
 

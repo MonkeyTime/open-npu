@@ -7,3 +7,4 @@ dist/
 runtime/
 .env
 deploy/secrets/
+capsule-private.pem
