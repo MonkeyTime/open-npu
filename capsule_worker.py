@@ -1,5 +1,6 @@
 """Exécute un étage signé sur NPU et conserve un seul graphe compilé à la fois."""
 
+from contextlib import ExitStack
 import hashlib
 import json
 import logging
@@ -11,47 +12,80 @@ from urllib.error import HTTPError
 import numpy as np
 from openvino import Core
 
-from capsule_manifest import HEX, tensor_size, verify_manifest
+from capsule_manifest import CAPSULE_ASSETS, HEX, tensor_size, verify_manifest
+from npu import AMD_PROVIDER, amd_npu, amd_session, onnx_bytes
 
 EXECUTION_TIMEOUT = 90
 NUMPY_TYPES = {"f16": "<f2", "f32": "<f4", "i32": "<i4"}
 
 
-def execute_stages(connection, directory):
-    compiled = None
+def compile_stage(path, stage, target, accelerator):
+    specs = [stage["input"], stage["output"]]
+    if target == AMD_PROVIDER:
+        session = amd_session(accelerator, onnx_bytes(path))
+        inputs, outputs = session.get_inputs(), session.get_outputs()
+        if len(inputs) != 1 or len(outputs) != 1:
+            raise ValueError("Une étape exige exactement une entrée et une sortie.")
+        types = {"f16": "tensor(float16)", "f32": "tensor(float)", "i32": "tensor(int32)"}
+        for port, spec in zip((inputs[0], outputs[0]), specs):
+            if port.shape != spec["shape"] or port.type != types[spec["dtype"]]:
+                raise ValueError("Le graphe ne respecte pas son contrat signé.")
+        return lambda values: session.run([outputs[0].name], {inputs[0].name: values})[0]
+
+    core = Core()
+    if path.suffix == ".onnx":
+        model = core.read_model(onnx_bytes(path), b"")
+    else:
+        model = core.read_model(path, path.with_suffix(".bin"))
+    if len(model.inputs) != 1 or len(model.outputs) != 1:
+        raise ValueError("Une étape exige exactement une entrée et une sortie.")
+    for port, spec in zip((model.input(0), model.output(0)), specs):
+        if list(port.shape) != spec["shape"] or port.get_element_type().get_type_name() != spec["dtype"]:
+            raise ValueError("Le graphe ne respecte pas son contrat signé.")
+    model = core.compile_model(model, target)
+    return lambda values: model([values])[model.output(0)]
+
+
+def execute_stages(connection, directory, target):
     try:
-        while True:
-            stage = json.loads(connection.recv_bytes(4096))
-            raw = (Path(directory) / "input.bin").read_bytes()
-            if "model" in stage:
-                core = Core()
-                xml = Path(stage["model"])
-                model = core.read_model(xml, xml.with_suffix(".bin"))
-                if len(model.inputs) != 1 or len(model.outputs) != 1:
-                    raise ValueError("Une étape exige exactement une entrée et une sortie.")
-                for port, spec in ((model.input(0), stage["input"]), (model.output(0), stage["output"])):
-                    if list(port.shape) != spec["shape"] or port.get_element_type().get_type_name() != spec["dtype"]:
-                        raise ValueError("Le graphe ne respecte pas son contrat signé.")
-                compiled = core.compile_model(model, "NPU")
-            values = np.frombuffer(raw, dtype=NUMPY_TYPES[stage["input"]["dtype"]]).reshape(stage["input"]["shape"])
-            result = compiled([values])[compiled.output(0)]
-            (Path(directory) / "output.bin").write_bytes(result.astype(
-                NUMPY_TYPES[stage["output"]["dtype"]], copy=False).tobytes(order="C"))
-            connection.send_bytes(b"1")
-    except (EOFError, OSError, RuntimeError, ValueError):
+        with ExitStack() as resources:
+            accelerator = resources.enter_context(amd_npu()) if target == AMD_PROVIDER else None
+            compiled = None
+            try:
+                while True:
+                    stage = json.loads(connection.recv_bytes(4096))
+                    raw = (Path(directory) / "input.bin").read_bytes()
+                    if "model" in stage:
+                        compiled = compile_stage(Path(stage["model"]), stage, target, accelerator)
+                    values = np.frombuffer(raw, dtype=NUMPY_TYPES[stage["input"]["dtype"]]).reshape(stage["input"]["shape"])
+                    result = compiled(values)
+                    (Path(directory) / "output.bin").write_bytes(result.astype(
+                        NUMPY_TYPES[stage["output"]["dtype"]], copy=False).tobytes(order="C"))
+                    connection.send_bytes(b"1")
+            finally:
+                del compiled
+    except (EOFError, BrokenPipeError):
         pass
+    except Exception as error:
+        try:
+            connection.send_bytes(b"0" + str(error).encode("utf-8")[:4095])
+        except OSError:
+            pass
     finally:
         connection.close()
 
 
 class CapsuleWorker:
-    def __init__(self, public_key_file, post, open_request):
+    def __init__(self, public_key_file, post, open_request, target):
         self.public_key = public_key_file.read_text(encoding="ascii").strip()
         if not HEX.fullmatch(self.public_key):
             raise ValueError("Clé publique des capsules invalide.")
         self.fingerprint = hashlib.sha256(bytes.fromhex(self.public_key)).hexdigest()
         self.post = post
         self.open_request = open_request
+        self.target = target
+        self.formats = [2] if target == AMD_PROVIDER else [1, 2]
+        self.claim_path = "/v2/node/claim-onnx" if target == AMD_PROVIDER else "/v2/node/claim"
         self.process = None
         self.connection = None
         self.scratch = None
@@ -98,7 +132,7 @@ class CapsuleWorker:
             context = get_context("spawn")
             parent, child = context.Pipe()
             self.scratch = TemporaryDirectory(prefix="open-npu-inference-")
-            process = context.Process(target=execute_stages, args=(child, self.scratch.name), daemon=True)
+            process = context.Process(target=execute_stages, args=(child, self.scratch.name, self.target), daemon=True)
             try:
                 process.start()
             except BaseException:
@@ -114,7 +148,10 @@ class CapsuleWorker:
             self.connection.send_bytes(json.dumps(stage).encode())
             if not self.connection.poll(EXECUTION_TIMEOUT):
                 raise TimeoutError("Délai du processus NPU dépassé.")
-            if self.connection.recv_bytes(1) != b"1":
+            response = self.connection.recv_bytes(4096)
+            if response.startswith(b"0"):
+                raise ValueError(response[1:].decode("utf-8", errors="replace"))
+            if response != b"1":
                 raise ValueError("Réponse du processus NPU illisible.")
             with (Path(self.scratch.name) / "output.bin").open("rb") as output:
                 result = output.read(expected + 1)
@@ -130,6 +167,8 @@ class CapsuleWorker:
         manifest, identity = verify_manifest(task["capsule"], self.public_key)
         if identity != task["digest"]:
             raise ValueError("Empreinte de capsule incohérente.")
+        if manifest["format"] not in self.formats:
+            raise ValueError("Format de capsule incompatible avec cette NPU.")
         stage = manifest["stages"][task["stage"]]
         cache_key = (identity, task["stage"])
         expected = tensor_size(stage["input"])
@@ -142,10 +181,10 @@ class CapsuleWorker:
             return self.infer(contract, raw)
         self.close()
         with TemporaryDirectory(prefix="open-npu-capsule-") as directory:
-            xml = Path(directory) / "stage.xml"
-            self.download(xml, "xml", stage["xml"])
-            self.download(xml.with_suffix(".bin"), "bin", stage["bin"])
-            result = self.infer(contract | {"model": str(xml)}, raw)
+            extensions = CAPSULE_ASSETS[manifest["format"]]
+            for extension in extensions:
+                self.download(Path(directory) / f"stage.{extension}", extension, stage[extension])
+            result = self.infer(contract | {"model": str(Path(directory) / f"stage.{extensions[0]}")}, raw)
         self.cache_key = cache_key
         logging.info("Capsule %s v%s étape %d compilée sur NPU dans un processus dédié.",
                      manifest["id"], manifest["version"], task["stage"] + 1)
@@ -154,7 +193,8 @@ class CapsuleWorker:
     def poll(self, limit, status):
         try:
             if self.task is None:
-                self.task = self.post("/v2/node/claim", {"fingerprint": self.fingerprint})["task"]
+                self.task = self.post(self.claim_path,
+                                      {"fingerprint": self.fingerprint, "formats": self.formats})["task"]
             if self.task is None:
                 return False
             status("Capsule · calcul par étapes", "working")
@@ -162,7 +202,7 @@ class CapsuleWorker:
                 if self.output is None:
                     self.output = self.evaluate()
             except (ValueError, RuntimeError, KeyError, IndexError):
-                logging.exception("Étape OpenVINO non exécutable.")
+                logging.exception("Étape non exécutable sur la NPU.")
                 with self.exchange("fail", b""):
                     pass
             else:

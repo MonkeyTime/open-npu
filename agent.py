@@ -1,4 +1,4 @@
-"""Agent Windows OPEN-NPU. Le seul graphe exécutable est intégré au binaire."""
+"""Agent Windows OPEN-NPU."""
 
 import argparse
 from multiprocessing import freeze_support
@@ -17,6 +17,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+import winreg
 
 import numpy as np
 from openvino import Core, Model, Type, opset13
@@ -26,6 +27,7 @@ from capsule_worker import CapsuleWorker
 from agent_updates import AgentUpdates
 from network import (MAX_RATE, MIN_UPLOAD_LIMIT, PROBE_BYTES, PROBE_INTERVAL, estimate_mbps,
                      optional_number, paced_body)
+from npu import AMD_PROVIDER, intel_device, probe_amd
 from preferences import Preferences, pause_reason, save_json
 from tray import run_tray
 
@@ -37,7 +39,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 HTTP = build_opener(NoRedirect)
 UPDATE_HTTP = build_opener(ProxyHandler({}), NoRedirect)
-AGENT_VERSION = "0.3.6"
+AGENT_VERSION = "0.3.7"
 
 
 class SystemPowerStatus(ctypes.Structure):
@@ -57,18 +59,17 @@ def contribution(preferences):
 
 def compile_capsule():
     core = Core()
-    if "NPU" not in core.available_devices:
-        raise RuntimeError(f"NPU indisponible dans OpenVINO. Périphériques vus : {core.available_devices}")
+    target = intel_device(core)
     values = opset13.parameter([1, WIDTH], Type.f16, name="values")
     model = Model([opset13.multiply(values, values)], [values], CAPSULE)
-    device = core.get_property("NPU", "FULL_DEVICE_NAME")
-    properties = core.get_property("NPU", "SUPPORTED_PROPERTIES")
+    device = core.get_property(target, "FULL_DEVICE_NAME")
+    properties = core.get_property(target, "SUPPORTED_PROPERTIES")
     hardware = None
     if "DEVICE_ARCHITECTURE" in properties and "NPU_MAX_TILES" in properties:
-        architecture = core.get_property("NPU", "DEVICE_ARCHITECTURE")
-        tiles = core.get_property("NPU", "NPU_MAX_TILES")
+        architecture = core.get_property(target, "DEVICE_ARCHITECTURE")
+        tiles = core.get_property(target, "NPU_MAX_TILES")
         hardware = f"{device} · OpenVINO {architecture} · {tiles} tuiles"
-    return core.compile_model(model, "NPU"), device, hardware
+    return core.compile_model(model, target), device, hardware, target
 
 
 def calculate(compiled, values):
@@ -180,7 +181,10 @@ def measure_network(config):
 def run(config, compiled, device, hardware, stop, status, preferences, pipeline=None, config_path=None):
     pending = None
     network = {}
-    capacity = {"capsule": CAPSULE, "device": device, "network": network, "agent_version": AGENT_VERSION}
+    capacity = {"device": device, "network": network, "agent_version": AGENT_VERSION}
+    if compiled is not None:
+        capacity["capsule"] = CAPSULE
+    idle_status = "Clé de capsule requise" if compiled is None and pipeline is None else "Disponible"
     probe_after = 0
     sample_limit = None
     previous_limit = None
@@ -238,18 +242,18 @@ def run(config, compiled, device, hardware, stop, status, preferences, pipeline=
                     logging.warning("L’état d’activation n’a pas pu être enregistré.")
             network.pop("sample", None)
             if task:
+                if compiled is None or task["capsule"] != CAPSULE:
+                    raise ValueError("Capsule inconnue ou incompatible.")
                 idle_delay = 2
                 pipeline_turn = True
                 status("Calcul en cours", "working")
-                if task["capsule"] != CAPSULE:
-                    raise ValueError("Capsule inconnue.")
                 pending = {key: task[key] for key in ("job", "position", "lease")}
                 pending["values"] = calculate(compiled, task["values"])
                 continue
             if not reason and pipeline is not None and pipeline.poll(limit, status):
                 idle_delay = 2
                 continue
-            status(reason or "Disponible", "waiting" if reason else "ready")
+            status(reason or idle_status, "waiting" if reason or idle_status != "Disponible" else "ready")
             delay = idle_delay
             idle_delay = min(12, idle_delay * 1.5)
         except HTTPError as error:
@@ -286,10 +290,15 @@ def run_agent(path, stop, status, preferences):
             enroll(config, path, stop)
         if not stop.is_set():
             status("Initialisation de la NPU", "waiting")
-            compiled, device, hardware = probe_capsule()
+            compiled, device, hardware, target = probe_capsule()
             public_key = path.with_name("capsule-signing.pub")
-            pipeline = CapsuleWorker(public_key, lambda route, data: api(config, route, data),
-                                     lambda route, body=None, **options: open_request(config, route, body, **options)) if public_key.is_file() else None
+            pipeline = None
+            if public_key.is_file():
+                pipeline = CapsuleWorker(public_key, lambda route, data: api(config, route, data),
+                                         lambda route, body=None, **options: open_request(config, route, body, **options),
+                                         target)
+            elif compiled is None:
+                logging.info("Une clé publique capsule-signing.pub est requise pour recevoir les tâches ONNX.")
             try:
                 run(config, compiled, device, hardware, stop, status, preferences, pipeline, path)
             finally:
@@ -335,13 +344,30 @@ def main():
 
 
 def probe_capsule():
-    compiled, device, hardware = compile_capsule()
-    check = calculate(compiled, [2, -3, 4])
-    if check != [4, 9, 16]:
-        raise RuntimeError(f"L'autotest NPU a produit {check}.")
-    logging.info("Autotest réussi sur %s, périphériques d'exécution %s.", device,
-                 compiled.get_property("EXECUTION_DEVICES"))
-    return compiled, device, hardware
+    try:
+        compiled, device, hardware, target = compile_capsule()
+        check = calculate(compiled, [2, -3, 4])
+        execution_devices = compiled.get_property("EXECUTION_DEVICES")
+        if isinstance(execution_devices, str):
+            execution_devices = [execution_devices]
+        if check != [4, 9, 16] or not execution_devices or any(
+            item.partition(".")[0] != "NPU" for item in execution_devices
+        ):
+            raise RuntimeError(f"Autotest Intel invalide : {check}, périphériques {execution_devices}.")
+        logging.info("Autotest réussi sur %s, périphériques d'exécution %s.", device, execution_devices)
+        return compiled, device, hardware, target
+    except RuntimeError as error:
+        logging.info("Chemin Intel OpenVINO indisponible : %s", error)
+
+    probe_amd()
+    device = "AMD Ryzen AI"
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+            cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
+    except OSError:
+        cpu = device
+    logging.info("Autotest NPU ONNX réussi sur %s avec %s.", cpu, AMD_PROVIDER)
+    return None, device, f"{cpu} · {AMD_PROVIDER}"[:160], AMD_PROVIDER
 
 
 if __name__ == "__main__":

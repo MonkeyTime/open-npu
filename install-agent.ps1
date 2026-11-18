@@ -177,7 +177,7 @@ try {
     if ($Update) {
         $probeLog = Join-Path $staged 'update-probe.log'
         $probe = Start-Process -FilePath (Join-Path $staged 'OpenNpuAgent.exe') -ArgumentList ('--probe --log "{0}"' -f $probeLog) -WorkingDirectory $install -WindowStyle Hidden -PassThru
-        if (!$probe.WaitForExit(30000)) {
+        if (!$probe.WaitForExit(180000)) {
             Stop-Process -InputObject $probe -ErrorAction SilentlyContinue
             throw "The new agent did not pass its NPU self-test. See $probeLog."
         }

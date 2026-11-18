@@ -1,4 +1,4 @@
-"""Format signé des capsules OpenVINO et validation des tenseurs v2."""
+"""Formats signés des capsules et validation des tenseurs v2."""
 
 import hashlib
 import json
@@ -14,6 +14,7 @@ MAX_ASSET = 512 * 1024 * 1024
 DTYPES = {"f16": (2, "e"), "f32": (4, "f"), "i32": (4, "i")}
 CAPSULE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,47}")
 HEX = re.compile(r"[0-9a-f]{64}")
+CAPSULE_ASSETS = {1: ("xml", "bin"), 2: ("onnx",)}
 
 
 def canonical(manifest):
@@ -34,7 +35,8 @@ def verify_manifest(document, public_key):
         manifest = document["manifest"]
         signed = canonical(manifest)
         Ed25519PublicKey.from_public_bytes(bytes.fromhex(public_key)).verify(bytes.fromhex(document["signature"]), signed)
-        if manifest["format"] != 1 or not CAPSULE_ID.fullmatch(manifest["id"]):
+        if (type(manifest["format"]) is not int or manifest["format"] not in CAPSULE_ASSETS
+                or not CAPSULE_ID.fullmatch(manifest["id"])):
             raise ValueError("Identifiant ou format invalide.")
         if type(manifest["version"]) is not int or not 1 <= manifest["version"] <= 1_000_000:
             raise ValueError("Version invalide.")
@@ -53,7 +55,7 @@ def verify_manifest(document, public_key):
                     raise ValueError("Contrat du tenseur invalide.")
             if index and stages[index - 1]["output"] != stage["input"]:
                 raise ValueError("Les contrats de deux étapes successives doivent coïncider.")
-            for asset in ("xml", "bin"):
+            for asset in CAPSULE_ASSETS[manifest["format"]]:
                 info = stage[asset]
                 if (not HEX.fullmatch(info["sha256"]) or type(info["size"]) is not int
                         or not 0 <= info["size"] <= MAX_ASSET):

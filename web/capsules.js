@@ -53,7 +53,9 @@ async function refresh() {
           dialog.showModal();
         });
       }
-      return [capsule.id, capsule.version, capsule.available ? (capsule.kind === "decoder" ? t("Décodeur Transformer") : t("Chaîne de tenseurs")) : "—",
+      const kind = capsule.kind === "decoder" ? t("Décodeur Transformer") : t("Chaîne de tenseurs");
+      const format = capsule.format === 2 ? "ONNX" : "OpenVINO IR";
+      return [capsule.id, capsule.version, capsule.available ? `${kind} · ${format}` : "—",
         capsule.stages ?? "—", !capsule.available ? t("Indisponible") : capsule.approved ? t("Approuvée") : t("En attente"), button];
     }), 6);
     table("pipeline-rows", queue.jobs.map((job) => {

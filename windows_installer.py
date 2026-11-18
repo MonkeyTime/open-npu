@@ -42,9 +42,9 @@ def package_version(archive):
     return version
 
 
-def installer_command(script, *args):
+def installer_command(script, *args, timeout=180):
     result = subprocess.run(AgentUpdates.powershell(script, *args), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            creationflags=subprocess.CREATE_NO_WINDOW, timeout=180)
+                            creationflags=subprocess.CREATE_NO_WINDOW, timeout=timeout)
     if result.returncode:
         raise RuntimeError(result.stdout.decode("oem", errors="replace").strip() or "L’installateur n’a pas abouti.")
 
@@ -75,7 +75,7 @@ def install_local(archive, destination, server, invitation, startup):
             (package / "enrollment.json").write_text(json.dumps({"server": server, **bootstrap}), encoding="utf-8")
             if not startup:
                 args.append("-NoStartup")
-        installer_command(package / "install-agent.ps1", *args)
+        installer_command(package / "install-agent.ps1", *args, timeout=300 if update else 180)
     if update:
         return "updated"
     return enrollment_result(config_path)

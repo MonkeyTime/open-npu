@@ -8,9 +8,9 @@ The language selector on the home page, in the documentation, and in the adminis
 
 Use `web/locales/fr.json` as the reference for maintaining translations. HTML pages link text to the catalogue with `data-i18n`, and scripts use `t()`. Preserve parameters such as `{0}` and markers such as `__KEEP0__`, `__OPEN0__`, and `__CLOSE0__`. The portal loads only the selected catalogue.
 
-To package OpenVINO graphs separately or test the distributed decoder, see the [signed capsule guide](docs/CAPSULES.md).
+To package OpenVINO or ONNX graphs or test the distributed decoder, see the [signed capsule guide](docs/CAPSULES.md).
 
-OPEN-NPU is a local prototype for volunteer computing. Research teams submit projects through the portal. The super administrator approves them and issues an API key for each project. Windows agents enroll automatically, poll the server, and run batches on Intel AI Boost with OpenVINO.
+OPEN-NPU is a local prototype for volunteer computing. Research teams submit projects through the portal. The super administrator approves them and issues an API key for each project. Windows x64 agents enroll automatically, poll the server, and run work on Intel AI Boost or compatible AMD Ryzen AI NPUs.
 
 ## Deploy on Ubuntu
 
@@ -75,18 +75,18 @@ For a local unsigned release on a loopback instance, run `.\install-agent.ps1 -U
 Publish a ZIP after building the matching agent version. Pilot deployments require a code-signing certificate and an HTTPS timestamp service.
 
 ```powershell
-.\publish-agent-release.ps1 -Version 0.3.6 -AgentDirectory ".\dist\OpenNpuAgent"
+.\publish-agent-release.ps1 -Version 0.3.7 -AgentDirectory ".\dist\OpenNpuAgent"
 .\publish-agent-release.ps1 -Version $version -AgentDirectory $buildDirectory -SignerThumbprint $signerThumbprint -TimestampServer $timestampUrl
 ```
 
 The script writes the public archive and `latest.json` under `runtime/agent-releases/` by default. For a remote instance, publish on the trusted Windows packaging workstation and copy the signed release to `agent-releases/` inside the server state directory. Copy the archive before replacing `latest.json`.
 
-To build and publish the graphical installer for a local release, run `.\build-windows-installer.ps1 -Version 0.3.6` after publishing the corresponding ZIP. The installer embeds the agent and dependencies. It contains no invitation. The unsigned installer is unavailable in pilot mode.
+To build and publish the graphical installer for a local release, run `.\build-windows-installer.ps1 -Version 0.3.7` after publishing the corresponding ZIP. The installer embeds the agent and its Python dependencies. It contains no invitation. The unsigned installer is unavailable in pilot mode.
 
 To open registration on a remote pilot, set `OPEN_NPU_PUBLIC_ENROLLMENT=1` and build a signed installer on the packaging workstation using the signed release ZIP made with the same certificate. Deploy both archives and the release metadata to the server state directory. The installer embeds the instance address and the publisher fingerprint. Downloaders still need to trust the Authenticode publisher.
 
 ```powershell
-.\build-windows-installer.ps1 -Version 0.3.6 -Server "https://npu.example.org" -SignerThumbprint $signerThumbprint -TimestampServer $timestampUrl
+.\build-windows-installer.ps1 -Version 0.3.7 -Server "https://npu.example.org" -SignerThumbprint $signerThumbprint -TimestampServer $timestampUrl
 ```
 
 ### Manage the fleet
@@ -113,7 +113,14 @@ Reserved nodes take new batches only from their assigned project. Shared nodes p
 
 ## Build the agent
 
-Building requires Windows x64 and Python 3.12. Running the agent requires a working Intel NPU driver.
+Building requires Windows x64 and Python 3.12.
+
+| Integrated NPU | Runtime requirements | Workloads |
+| --- | --- | --- |
+| Intel AI Boost | Intel NPU driver and bundled OpenVINO | Built-in FP16 demo, signed OpenVINO IR and ONNX capsules |
+| AMD Ryzen AI | Windows 11 24H2 or later, [Windows App Runtime 2.3 x64](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads), and a [compatible AMD NPU and driver](https://ryzenai.docs.amd.com/projects/WinML/en/latest/installation.html) | Signed ONNX capsules via Windows ML and Vitis AI |
+
+On AMD, Windows ML can download Vitis AI on the first probe. Deploy the updated server for ONNX jobs and install the trusted capsule public key next to `node.json`. AMD nodes can take shared v2 jobs or be selected explicitly for project reservations. Automatic reservations are for nodes that support the built-in FP16 demo.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -123,7 +130,7 @@ py -3.12 -m venv .venv
 
 If you manage Python with the local `uv.exe`, replace the first two commands with `.\.tools\uv.exe venv --python 3.12` and `.\.tools\uv.exe pip install -r requirements.txt`.
 
-To check the accelerator independently of the server, run the executable with `--probe` and inspect `runtime/agent.log`. OpenVINO explicitly targets the `NPU` for inference.
+To check the accelerator independently of the server, run the executable with `--probe` and inspect `runtime/agent.log`. The probe runs a test graph on the selected NPU and returns a nonzero exit code if no usable NPU passes. CPU and GPU fallback are disabled.
 
 ## Submit a computation
 
@@ -156,6 +163,6 @@ In the agent's sharing settings, set the upload limit in Mbps for results and pr
 
 When a job is submitted, the server can reduce batch sizes based on the estimated network budget of eligible nodes. Before assigning a batch, it checks whether the estimated transfer time and compute margin fit within the lease. Agents can still process small batches when measurements are missing or stale. The declared upload limit remains in effect.
 
-The v1 queue runs independent batches for the demo capsule. The v2 queue schedules and distributes stages of signed OpenVINO capsules and transfers intermediate tensors. The v2 decoder recomputes the prefix for each token. Each model must be partitioned, exported, and validated on the target hardware.
+The v1 queue runs independent batches for the demo capsule. The v2 queue schedules and distributes stages of signed OpenVINO IR or ONNX capsules and transfers intermediate tensors. The v2 decoder recomputes the prefix for each token. Each model must be partitioned, exported, and validated on the target hardware.
 
 The local instance listens on loopback. A volunteer network needs an HTTPS endpoint and a way to verify node results. The local test checks the hardware and API workflow using the demo capsule.

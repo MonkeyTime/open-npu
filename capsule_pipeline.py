@@ -1,4 +1,4 @@
-"""Catalogue approuvé et séquencement des capsules OpenVINO."""
+"""Catalogue approuvé et séquencement des capsules NPU."""
 
 import hashlib
 import json
@@ -9,7 +9,7 @@ import time
 from flask import Blueprint, abort, jsonify, request, send_file
 from werkzeug.exceptions import Conflict
 
-from capsule_manifest import (MAX_TENSOR, HEX, asset_digest, next_token, outputs_agree, pack_values,
+from capsule_manifest import (CAPSULE_ASSETS, MAX_TENSOR, HEX, asset_digest, next_token, outputs_agree, pack_values,
                               tensor_size, validate_output, verify_manifest)
 from network import transfer_profile, upload_seconds
 
@@ -25,7 +25,8 @@ def initialize_pipeline(db):
             approved INTEGER NOT NULL, UNIQUE(id,version)
         );
         CREATE TABLE IF NOT EXISTS pipeline_workers (
-            node INTEGER PRIMARY KEY REFERENCES nodes(id), fingerprint TEXT NOT NULL, seen REAL NOT NULL
+            node INTEGER PRIMARY KEY REFERENCES nodes(id), fingerprint TEXT NOT NULL, seen REAL NOT NULL,
+            formats INTEGER NOT NULL DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS pipeline_jobs (
             id TEXT PRIMARY KEY, project INTEGER NOT NULL REFERENCES projects(id), digest TEXT NOT NULL,
@@ -56,6 +57,9 @@ def initialize_pipeline(db):
 
 
 def migrate_pipeline(db):
+    worker_columns = {column["name"] for column in db.execute("PRAGMA table_info(pipeline_workers)")}
+    if "formats" not in worker_columns:
+        db.execute("ALTER TABLE pipeline_workers ADD COLUMN formats INTEGER NOT NULL DEFAULT 1")
     columns = {column["name"] for column in db.execute("PRAGMA table_info(pipeline_jobs)")}
     if "verify_results" not in columns:
         db.execute("ALTER TABLE pipeline_jobs ADD COLUMN verify_results INTEGER NOT NULL DEFAULT 0")
@@ -78,7 +82,7 @@ def signed_bundle(directory, public_key, *, verify_assets=False):
     if directory.name != digest:
         raise ValueError("Le dossier ne correspond pas à l’empreinte du manifeste.")
     for index, stage in enumerate(manifest["stages"]):
-        for extension in ("xml", "bin"):
+        for extension in CAPSULE_ASSETS[manifest["format"]]:
             asset = directory / f"{index}.{extension}"
             expected = stage[extension]
             if asset.stat().st_size != expected["size"] or (verify_assets and asset_digest(asset) != expected["sha256"]):
@@ -86,13 +90,14 @@ def signed_bundle(directory, public_key, *, verify_assets=False):
     return document, manifest
 
 
-def eligible_workers(db, project, fingerprint, now):
+def eligible_workers(db, project, fingerprint, now, capsule_format):
     return {row["id"] for row in db.execute("""
         SELECT n.id FROM pipeline_workers w JOIN nodes n ON n.id=w.node
         LEFT JOIN project_nodes pn ON pn.node=n.id
-        WHERE w.fingerprint=? AND w.seen>=? AND n.enabled=1 AND n.revoked=0 AND n.paused=0
+        WHERE w.fingerprint=? AND w.seen>=? AND (w.formats & ?)<>0
+          AND n.enabled=1 AND n.revoked=0 AND n.paused=0
           AND (pn.project=? OR (pn.project IS NULL AND (SELECT dedicated FROM projects WHERE id=?)=0))
-    """, (fingerprint, now - WORKER_TTL, project, project))}
+    """, (fingerprint, now - WORKER_TTL, 1 << (capsule_format - 1), project, project))}
 
 
 def stage_node(db, job, available, capable, stage_count, caller):
@@ -187,7 +192,7 @@ def install_routes(app, runtime, database, admin, project, node, payload, admiss
                 continue
             approval = approvals.pop(entry.name, None)
             items.append(dict(digest=entry.name, id=manifest["id"], version=manifest["version"],
-                              kind=manifest["kind"], stages=len(manifest["stages"]),
+                              kind=manifest["kind"], stages=len(manifest["stages"]), format=manifest["format"],
                               approved=bool(approval and approval["approved"]), available=True))
         items.extend(dict(item, available=False) for item in approvals.values() if item["approved"])
         return jsonify(capsules=items, owner=role == "owner", configured=True)
@@ -236,7 +241,7 @@ def install_routes(app, runtime, database, admin, project, node, payload, admiss
                 _, manifest = signed_bundle(folder(item["digest"]), public)
             except (OSError, ValueError):
                 continue
-            item.update(kind=manifest["kind"], stages=len(manifest["stages"]),
+            item.update(kind=manifest["kind"], stages=len(manifest["stages"]), format=manifest["format"],
                         input=manifest["stages"][0]["input"], output=manifest["stages"][-1]["output"])
             available.append(item)
         return jsonify(capsules=available)
@@ -365,9 +370,15 @@ def install_routes(app, runtime, database, admin, project, node, payload, admiss
                 abort(404)
             return app.response_class(row["output"], mimetype="application/octet-stream")
 
-    @bp.post("/v2/node/claim")
-    def claim():
+    @bp.post("/v2/node/claim", defaults={"onnx_only": False})
+    @bp.post("/v2/node/claim-onnx", defaults={"onnx_only": True})
+    def claim(onnx_only):
         data = payload()
+        formats = [2] if onnx_only else data.get("formats", [1])
+        if (not isinstance(formats, list) or not 1 <= len(formats) <= len(CAPSULE_ASSETS)
+                or any(type(value) is not int or value not in CAPSULE_ASSETS for value in formats)):
+            abort(400, description="Formats de capsules invalides.")
+        format_mask = sum(1 << (value - 1) for value in set(formats))
         with database() as db:
             node(db)
             required = hashlib.sha256(bytes.fromhex(trust())).hexdigest()
@@ -378,9 +389,9 @@ def install_routes(app, runtime, database, admin, project, node, payload, admiss
             now = time.time()
             expire_pipeline(db, now)
             db.execute("""
-                INSERT INTO pipeline_workers VALUES (?,?,?) ON CONFLICT(node)
-                DO UPDATE SET fingerprint=excluded.fingerprint,seen=excluded.seen
-            """, (caller, required, now))
+                INSERT INTO pipeline_workers(node,fingerprint,seen,formats) VALUES (?,?,?,?) ON CONFLICT(node)
+                DO UPDATE SET fingerprint=excluded.fingerprint,seen=excluded.seen,formats=excluded.formats
+            """, (caller, required, now, format_mask))
             if pipeline_busy(db, caller, now) or db.execute(
                 "SELECT 1 FROM tasks WHERE node=? AND status='running' AND expires>?", (caller, now)
             ).fetchone():
@@ -400,7 +411,9 @@ def install_routes(app, runtime, database, admin, project, node, payload, admiss
                             verification_node=NULL,verification_output=NULL WHERE id=?
                     ''', (job["id"],))
                     continue
-                available = eligible_workers(db, job["project"], required, now)
+                if manifest["format"] not in formats:
+                    continue
+                available = eligible_workers(db, job["project"], required, now, manifest["format"])
                 if caller not in available:
                     continue
                 stage = manifest["stages"][job["stage"]]
@@ -449,10 +462,13 @@ def install_routes(app, runtime, database, admin, project, node, payload, admiss
             job = current_job(db, job_id, node(db), lease_key())
             return app.response_class(job["input"], mimetype="application/octet-stream")
 
-    @bp.get("/v2/node/stages/<job_id>/assets/<any(xml,bin):extension>")
+    @bp.get("/v2/node/stages/<job_id>/assets/<any(xml,bin,onnx):extension>")
     def artifact(job_id, extension):
         with database() as db:
             job = current_job(db, job_id, node(db), lease_key())
+            _, manifest = load(job["digest"])
+            if extension not in CAPSULE_ASSETS[manifest["format"]]:
+                abort(404)
             file = folder(job["digest"]) / f"{job['stage']}.{extension}"
         if not file.is_file():
             abort(404)

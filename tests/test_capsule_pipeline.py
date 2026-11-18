@@ -59,10 +59,50 @@ class CapsulePipelineTests(unittest.TestCase):
         response = self.client.post(f"/admin/capsules/{self.digest}/approve", auth=self.admin, json={})
         self.assertEqual(response.status_code, 200)
 
-    def claim(self, node):
-        response = self.client.post("/v2/node/claim", headers=self.headers(node), json={"fingerprint": self.fingerprint})
+    def claim(self, node, path="/v2/node/claim", **capabilities):
+        response = self.client.post(path, headers=self.headers(node),
+                                    json={"fingerprint": self.fingerprint, **capabilities})
         self.assertEqual(response.status_code, 200)
         return response.json["task"]
+
+    def test_capsule_formats_are_routed_to_compatible_workers(self):
+        source = self.root / "onnx"
+        source.mkdir()
+        spec = {"dtype": "f32", "shape": [1, 2]}
+        manifest = {"format": 2, "id": "test-onnx", "version": 1, "kind": "tensor",
+                    "stages": [{"input": spec, "output": spec}]}
+        (source / "definition.json").write_text(json.dumps(manifest))
+        model = b"signed ONNX bytes"
+        (source / "0.onnx").write_bytes(model)
+        digest = sign(source, self.key)
+        self.assertEqual(publish(source, self.state), digest)
+        self.assertEqual(self.client.post(f"/admin/capsules/{digest}/approve", auth=self.admin, json={}).status_code, 200)
+        response = self.client.post("/v2/jobs", headers=self.headers("research"),
+                                    json={"capsule": "test-onnx", "version": 1, "values": [2, 5]})
+        self.assertEqual(response.status_code, 202)
+        onnx_job = response.json["id"]
+        self.assertIsNone(self.claim("bob"))
+        legacy_job = self.submit_test_job()
+
+        heartbeat = self.client.post("/v1/node/claim", headers=self.headers("alice"), json={"device": "AMD Ryzen AI"})
+        self.assertIsNone(heartbeat.json["task"])
+        task = self.claim("alice", path="/v2/node/claim-onnx")
+        self.assertEqual(task["job"], onnx_job)
+        headers = self.headers("alice", task["lease"])
+        path = f"/v2/node/stages/{onnx_job}"
+        with self.client.get(path + "/assets/onnx", headers=headers) as asset:
+            self.assertEqual(asset.data, model)
+        self.assertEqual(self.client.get(path + "/assets/xml", headers=headers).status_code, 404)
+        self.assertEqual(self.client.post(path + "/result", headers=headers, data=struct.pack("<2f", 4, 10)).status_code, 200)
+        self.assertIsNone(self.claim("alice", formats=[2]))
+        self.assertEqual(self.claim("bob")["job"], legacy_job)
+        self.assertEqual(self.client.post("/admin/projects/1/reservation", auth=self.admin,
+                                         json={"count": 1, "node_ids": [1]}).status_code, 200)
+        response = self.client.post("/v2/jobs", headers=self.headers("research"),
+                                    json={"capsule": "test-onnx", "version": 1, "values": [2, 5]})
+        self.assertEqual(response.status_code, 202)
+        self.assertIsNone(self.claim("bob"))
+        self.assertEqual(self.claim("alice", formats=[2])["job"], response.json["id"])
 
     def test_signature_and_approval_distinct_nodes_two_tokens(self):
         spec = {"capsule": "test-decoder", "version": 1, "tokens": [2], "max_new_tokens": 2}

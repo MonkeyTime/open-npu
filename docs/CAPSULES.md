@@ -1,6 +1,30 @@
-# Signed OpenVINO capsules and distributed decoding
+# Signed NPU capsules and distributed decoding
 
-The Windows agent 0.3.2 loads an approved OpenVINO IR graph from the server. Each stage has an XML file, a BIN file, and a static tensor contract. The manifest identifies assets by SHA-256 and carries an Ed25519 signature. The agent verifies the signature and file integrity before compiling the graph explicitly for `NPU`. The tray agent runs compilation and inference in a separate OpenVINO process with a 90-second timeout per computation. The process caches one compiled stage and runs under the current Windows account. The pilot requires graphs reviewed by the trusted publisher.
+Each stage contains a graph and a static tensor contract. The manifest identifies assets by SHA-256 and carries an Ed25519 signature. The agent verifies the signature and file integrity, then compiles the graph for the NPU in a dedicated process with a 90-second timeout per computation. The process caches one compiled stage and runs under the current Windows account. The pilot requires graphs reviewed by the trusted publisher.
+
+| Manifest format | Stage files | Compatible agents |
+| --- | --- | --- |
+| 1 | `0.xml` and `0.bin`, then `1.xml` and `1.bin` for the next stage | Intel / OpenVINO |
+| 2 | `0.onnx`, then `1.onnx` for the next stage | Agent 0.3.7+ on Intel / OpenVINO or compatible AMD Ryzen AI / Vitis AI |
+
+An ONNX stage must have one static input and one static output matching its signed tensor contract. Include all weights inside the ONNX file. Validate each graph on its target NPU and driver before approval. Vitis AI may compile FP32 graphs to BF16 and supports a hardware-dependent set of operators. [AMD model support](https://ryzenai.docs.amd.com/projects/WinML/en/stable/model_support.html)
+
+To try an ONNX tensor capsule, copy the repository's `npu-probe.onnx` to `0.onnx` inside a new bundle directory and save this `definition.json` beside it. Sign and import the bundle with the commands below, substituting its directory for `tiny-decoder`. Submit 1,024 input values to `/v2/jobs` and read the FP32 output. This model doubles each input within the probe's small integer range.
+
+```json
+{
+  "format": 2,
+  "id": "npu-probe",
+  "version": 1,
+  "kind": "tensor",
+  "stages": [
+    {
+      "input": {"dtype": "f32", "shape": [1, 16, 8, 8]},
+      "output": {"dtype": "f32", "shape": [1, 16, 8, 8]}
+    }
+  ]
+}
+```
 
 ## Set up signing trust
 

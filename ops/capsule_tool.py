@@ -1,4 +1,4 @@
-"""Créer, signer et importer une capsule OpenVINO sans transmettre la clé privée au serveur."""
+"""Créer, signer et importer une capsule sans transmettre la clé privée au serveur."""
 
 import argparse
 from getpass import getpass
@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from capsule_manifest import MAX_ASSET, asset_digest, canonical, verify_manifest
+from capsule_manifest import CAPSULE_ASSETS, MAX_ASSET, asset_digest, canonical, verify_manifest
 
 
 def write_new(path, body):
@@ -30,8 +30,9 @@ def keygen(private, public):
 
 def sign(source, key):
     manifest = json.loads((source / "definition.json").read_text(encoding="utf-8"))
+    extensions = CAPSULE_ASSETS[manifest["format"]]
     for index, stage in enumerate(manifest["stages"]):
-        for extension in ("xml", "bin"):
+        for extension in extensions:
             path = source / f"{index}.{extension}"
             size = path.stat().st_size
             if size > MAX_ASSET:
@@ -55,7 +56,7 @@ def publish(source, runtime):
         staged = Path(temporary) / digest
         staged.mkdir()
         for index, stage in enumerate(manifest["stages"]):
-            for extension in ("xml", "bin"):
+            for extension in CAPSULE_ASSETS[manifest["format"]]:
                 filename = f"{index}.{extension}"
                 candidate = source / filename
                 expected = stage[extension]

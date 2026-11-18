@@ -21,7 +21,7 @@ from waitress import serve
 
 from capsule import CAPSULE, MAX_VALUES, WIDTH, valid_values
 from capsule_manifest import MAX_TENSOR
-from capsule_pipeline import expire_pipeline, initialize_pipeline, install_routes, migrate_pipeline, pipeline_busy
+from capsule_pipeline import WORKER_TTL, expire_pipeline, initialize_pipeline, install_routes, migrate_pipeline, pipeline_busy
 from network import (MAX_RATE, MIN_UPLOAD_LIMIT, PROBE_BYTES, PROBE_INTERVAL, SAMPLE_VALID_SECONDS,
                      fits_lease, optional_number, transfer_profile)
 
@@ -964,10 +964,12 @@ def reservation_state(db, now, project_id=None):
     reservations = defaultdict(list)
     for row in db.execute("""
         SELECT pn.project,n.id,n.name,n.device,n.hardware,
-            (n.enabled=1 AND n.paused=0 AND coalesce(n.seen>=?,0) AND n.capsule IS ?) AS ready
+            (n.enabled=1 AND n.paused=0 AND coalesce(n.seen>=?,0)
+                AND (n.capsule IS ? OR coalesce(w.seen>=? AND (w.formats & 2)<>0,0))) AS ready
         FROM project_nodes pn JOIN nodes n ON n.id=pn.node
+        LEFT JOIN pipeline_workers w ON w.node=n.id
         WHERE (? IS NULL OR pn.project=?) ORDER BY n.id
-    """, (now - ONLINE_SECONDS, CAPSULE, project_id, project_id)):
+    """, (now - ONLINE_SECONDS, CAPSULE, now - WORKER_TTL, project_id, project_id)):
         item = dict(row)
         reservations[item.pop("project")].append(item)
     return reservations
@@ -1118,12 +1120,14 @@ def reserve_project(project_id):
             candidates = db.execute("""
                 SELECT n.id,n.name,n.device,n.hardware,pn.project FROM nodes n
                 LEFT JOIN project_nodes pn ON pn.node=n.id
-                WHERE n.enabled=1 AND n.paused=0 AND n.seen>=? AND n.capsule=?
+                LEFT JOIN pipeline_workers w ON w.node=n.id
+                WHERE n.enabled=1 AND n.paused=0 AND n.seen>=?
+                  AND (n.capsule=? OR (? AND w.seen>=? AND (w.formats & 2)<>0))
                   AND (pn.project IS NULL OR pn.project=?)
                   AND NOT EXISTS (SELECT 1 FROM tasks WHERE node=n.id AND status='running')
                   AND NOT EXISTS (SELECT 1 FROM pipeline_jobs WHERE node=n.id AND status='running')
                 ORDER BY (pn.project IS NOT NULL) DESC, n.id
-            """, (now - ONLINE_SECONDS, CAPSULE, project_id)).fetchall()
+            """, (now - ONLINE_SECONDS, CAPSULE, ids is not None, now - WORKER_TTL, project_id)).fetchall()
             if ids is not None:
                 available = {row["id"]: row for row in candidates}
                 if any(node_id not in available for node_id in ids):
