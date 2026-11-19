@@ -2,6 +2,8 @@
 
 *Open Participatory Edge Network for Neural Processing Units*
 
+OPEN-NPU is released under the permissive [MIT License](LICENSE). See the [roadmap to v1.0](#roadmap-to-v10), starting with the Windows agent.
+
 The portal publishes the API documentation at `/docs/api` and the JSON contract at `/docs/openapi.json`. To prepare a closed deployment, see the [staging guide](deploy/PILOTE.md).
 
 The language selector on the home page, in the documentation, and in the administration console saves your preference in the browser. A link such as `/docs/api?lang=en#capsules` opens the section in the selected language. The OpenAPI contract also accepts `?lang=en` to translate titles and descriptions while preserving routes and schemas.
@@ -166,3 +168,27 @@ When a job is submitted, the server can reduce batch sizes based on the estimate
 The v1 queue runs independent batches for the demo capsule. The v2 queue schedules and distributes stages of signed OpenVINO IR or ONNX capsules and transfers intermediate tensors. The v2 decoder recomputes the prefix for each token. Each model must be partitioned, exported, and validated on the target hardware.
 
 The local instance listens on loopback. A volunteer network needs an HTTPS endpoint and a way to verify node results. The local test checks the hardware and API workflow using the demo capsule.
+
+## Roadmap to v1.0
+
+Version 0.3.7 has been tested end to end on Intel AI Boost with signed ONNX and OpenVINO IR capsules. The AMD Ryzen AI path is implemented and still needs validation on physical hardware. The current unsigned Windows installer is for local trials. See the [latest release](https://github.com/MonkeyTime/open-npu/releases/latest) and [Windows runtime requirements](#build-the-agent).
+
+### 1. Finish the Windows agent and installer
+
+- [ ] Test the packaged x64 agent on physical Intel AI Boost and AMD Ryzen AI systems. Publish a compatibility matrix with processor, NPU driver, Windows build, supported capsule formats, and known limits. Require `--probe` and a representative signed job to pass on each supported configuration.
+- [ ] Make setup and diagnostics actionable. Identify missing drivers, Windows App Runtime, provider setup failures, unsupported models, and enrollment problems from distinct installer or tray messages. Let users export a diagnostic report with credentials removed.
+- [ ] Ship an Authenticode-signed and timestamped installer and ZIP for remote instances. Verify package integrity and publisher identity before updating. Publish SHA-256 checksums alongside the release files and document publisher trust and certificate rotation.
+- [ ] Test fresh install, upgrade from 0.3.6 and 0.3.7, rollback after a failed update, and clean uninstall on Windows under a standard user account. Verify that upgrades preserve enrollment and contribution settings, and that uninstall removes the agent and its sign-in entry.
+- [ ] Exercise suspend and resume, offline recovery, job interruption, pause and scheduling controls. Add release checks for packaging, install and update behavior, and NPU-only execution with no CPU or GPU fallback.
+- [ ] Evaluate Windows ARM64 and Qualcomm Snapdragon after the x64 release is stable. Add a native installer and compatibility entry once physical hardware tests pass.
+
+### 2. Validate distributed workloads and the pilot
+
+- [ ] Publish representative signed workloads and reference outputs. Validate numerical accuracy by hardware and precision, test retry and duplicate-result handling, and measure end-to-end throughput and latency with one and multiple agents.
+- [ ] Run a multi-site pilot with mixed Intel and AMD nodes. Measure job completion, network transfers, and recovery when nodes disconnect, and verify that project reservations and workload formats route correctly.
+- [ ] Document production deployment, monitoring, data retention, and backup and restore. Validate server upgrades and recovery against a copy of pilot data and rehearse capsule and enrollment key rotation.
+- [ ] Publish contributor and operator guides, a security reporting contact, and a v1.0 release checklist. Cut v1.0 after the signed Windows installer passes its lifecycle tests, the hardware matrix is published, and the multi-site pilot meets documented acceptance criteria.
+
+## License
+
+OPEN-NPU source code and project documentation are available under the [MIT License](LICENSE). You may use, modify, and redistribute them under its terms, including the copyright and permission notice. Third-party dependencies retain their own licenses.
